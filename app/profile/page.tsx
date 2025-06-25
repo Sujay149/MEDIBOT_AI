@@ -286,7 +286,7 @@ export default function ProfilePage() {
                           <SelectTrigger className="bg-slate-800 border-slate-700 text-white">
                             <SelectValue placeholder="Select gender" />
                           </SelectTrigger>
-                          <SelectContent className="bg-slate-800 border-slate-700">
+                          <SelectContent className="bg-slate-900 border-2 border-purple-600 text-white shadow-lg">
                             <SelectItem value="male">Male</SelectItem>
                             <SelectItem value="female">Female</SelectItem>
                             <SelectItem value="other">Other</SelectItem>
@@ -373,7 +373,7 @@ export default function ProfilePage() {
                           <SelectTrigger className="bg-slate-800 border-slate-700 text-white">
                             <SelectValue placeholder="Select blood type" />
                           </SelectTrigger>
-                          <SelectContent className="bg-slate-800 border-slate-700">
+                          <SelectContent className="bg-slate-900 border-2 border-purple-600 text-white shadow-lg">
                             <SelectItem value="A+">A+</SelectItem>
                             <SelectItem value="A-">A-</SelectItem>
                             <SelectItem value="B+">B+</SelectItem>

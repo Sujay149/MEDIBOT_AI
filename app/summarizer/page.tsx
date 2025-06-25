@@ -212,7 +212,7 @@ export default function SummarizerPage() {
                         <SelectTrigger className="bg-slate-800 border-slate-700 text-white">
                           <SelectValue />
                         </SelectTrigger>
-                        <SelectContent className="bg-slate-800 border-slate-700">
+                        <SelectContent className="bg-slate-900 border-2 border-purple-600 text-white shadow-lg">
                           <SelectItem value="general">🏥 General Medical</SelectItem>
                           <SelectItem value="symptoms">🤒 Symptoms & Signs</SelectItem>
                           <SelectItem value="medication">💊 Medications</SelectItem>
