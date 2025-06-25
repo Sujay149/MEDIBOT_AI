@@ -18,6 +18,7 @@ import {
 } from "@/lib/firestore"
 import Link from "next/link"
 import { toast } from "sonner"
+import Image from "next/image"
 
 export default function DashboardPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -134,10 +135,17 @@ export default function DashboardPage() {
               >
                 <Menu className="h-5 w-5" />
               </Button>
-              <div className="w-8 h-8 bg-gradient-to-r from-purple-600 to-blue-600 rounded-full flex items-center justify-center">
-                <span className="text-white text-sm font-bold">M</span>
-              </div>
-              <span className="text-purple-400 font-semibold">Medibot Dashboard</span>
+             <div className="w-8 h-8 bg-gradient-to-r from-purple-600 to-blue-600 rounded-full flex items-center justify-center overflow-hidden">
+  <Image
+    src="/logo.png"
+    alt="Medibot Icon"
+    width={29}
+    height={29}
+    className="object-cover rounded-full"
+  />
+</div>
+
+              <span className="text-purple-400 font-semibold">{userProfile?.displayName || "User"}'s  Dashboard</span>
             </div>
           </div>
 

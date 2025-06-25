@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useState, useEffect } from "react"
@@ -11,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Menu, Calendar, Plus, MapPin, Clock, User, Phone, Trash2, Edit, Navigation } from "lucide-react"
 import { useAuth } from "@/hooks/useAuth"
 import { AppointmentForm } from "@/components/appointment-form"
-import { deleteAppointment, subscribeToUserAppointments, type Appointment, addAppointment } from "@/lib/firestore"
+import { deleteAppointment, subscribeToUserAppointments, type Appointment } from "@/lib/firestore"
 import { toast } from "sonner"
 
 export default function AppointmentsPage() {
@@ -61,39 +60,6 @@ export default function AppointmentsPage() {
     }
   }
 
-  const testFirestoreConnection = async () => {
-    if (!user) return
-
-    try {
-      console.log("Testing Firestore connection...")
-      const testData = {
-        hospitalName: "Test Hospital",
-        hospitalAddress: "123 Test St",
-        hospitalPhone: "555-0123",
-        doctorName: "Dr. Test",
-        appointmentType: "consultation",
-        date: "2024-01-15",
-        time: "10:00",
-        notes: "Test appointment",
-        hospitalLocation: {
-          lat: 12.9716,
-          lng: 77.5946,
-        },
-      }
-
-      const result = await addAppointment(user.uid, testData)
-      console.log("Test appointment created with ID:", result)
-      toast.success("Test appointment created successfully!")
-    } catch (error) {
-      console.error("Test failed:", error)
-      if (error instanceof Error) {
-        toast.error(`Test failed: ${error.message}`)
-      } else {
-        toast.error("Test failed: An unknown error occurred.")
-      }
-    }
-  }
-
   const handleGetDirections = (appointment: Appointment) => {
     if (appointment.hospitalLocation) {
       const { lat, lng } = appointment.hospitalLocation
@@ -135,7 +101,7 @@ export default function AppointmentsPage() {
         <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
         <div className="flex-1 flex flex-col">
-          {/* Header: Responsive padding and button sizes */}
+          {/* Header */}
           <div className="flex items-center justify-between p-3 sm:p-4 border-b border-slate-800 bg-slate-900">
             <div className="flex items-center space-x-2 sm:space-x-3">
               <Button
@@ -149,27 +115,20 @@ export default function AppointmentsPage() {
               <div className="w-6 h-6 sm:w-8 sm:h-8 bg-gradient-to-r from-purple-600 to-blue-600 rounded-full flex items-center justify-center">
                 <Calendar className="h-3 w-3 sm:h-4 sm:w-4 text-white" />
               </div>
-              <span className="text-purple-400 font-semibold text-base sm:text-lg">My Appointments</span>
+              <span className="text-white font-semibold text-base sm:text-lg">My Appointments</span>
             </div>
 
             <div className="flex items-center space-x-1 sm:space-x-2">
-              {/* <Button
-                onClick={testFirestoreConnection}
-                variant="outline"
-                className="bg-slate-800 border-slate-700 text-white hover:bg-slate-700 rounded-xl h-8 sm:h-10 px-3 sm:px-4 text-xs sm:text-sm"
-              >
-                Test Connection
-              </Button> */}
               <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
                 <DialogTrigger asChild>
-                  {/* <Button
+                  <Button
                     onClick={handleAddAppointment}
-                    className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white rounded-xl h-8 sm:h-10 px-3 sm:px-4 text-xs sm:text-sm"
+                    className="bg-gradient-to-r from-indigo-600/20 to-indigo-400/20 border-indigo-500 text-white hover:bg-gradient-to-r hover:from-indigo-600/40 hover:to-indigo-400/40 rounded-lg h-8 sm:h-10 px-3 sm:px-4 text-xs sm:text-sm transform hover:scale-105 transition-transform duration-200"
                   >
                     <Plus className="mr-1 h-3 w-3 sm:h-4 sm:w-4" />
                     <span className="hidden sm:inline">Book Appointment</span>
                     <span className="sm:hidden">Book</span>
-                  </Button> */}
+                  </Button>
                 </DialogTrigger>
                 <DialogContent className="bg-slate-900 border-slate-800 text-white max-w-[90vw] sm:max-w-2xl mx-auto max-h-[90vh] overflow-y-auto p-4 sm:p-6 rounded-lg">
                   <DialogHeader>
@@ -193,15 +152,15 @@ export default function AppointmentsPage() {
             </div>
           </div>
 
-          {/* Content: Responsive padding and layout */}
+          {/* Content */}
           <div className="flex-1 p-3 sm:p-4 md:p-6 overflow-y-auto">
             <div className="max-w-full sm:max-w-4xl md:max-w-6xl mx-auto space-y-4 sm:space-y-6">
               <div>
-                <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-white mb-1 sm:mb-2">My Appointments</h1>
+                <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-white mb-1 sm:mb-2">Take your  Doctor Appointments From here...</h1>
                 <p className="text-slate-400 text-xs sm:text-sm">Manage your medical appointments and schedules</p>
               </div>
 
-              {/* Stats: Stack on mobile */}
+              {/* Stats */}
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
                 <Card className="bg-slate-900 border-slate-800">
                   <CardContent className="p-4 sm:p-6 text-center">
@@ -388,7 +347,7 @@ export default function AppointmentsPage() {
                   )}
                 </div>
               ) : (
-                /* Empty State: Responsive sizing */
+                /* Empty State */
                 <div className="bg-slate-900 rounded-2xl border border-slate-800 p-6 sm:p-8 md:p-12 text-center">
                   <div className="w-12 h-12 sm:w-16 sm:h-16 md:w-20 md:h-20 bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4 sm:mb-6 md:mb-8">
                     <Calendar className="h-6 w-6 sm:h-8 sm:w-8 md:h-10 md:w-10 text-slate-400" />
@@ -403,7 +362,7 @@ export default function AppointmentsPage() {
 
                   <Button
                     onClick={handleAddAppointment}
-                    className="bg-white text-slate-900 hover:bg-slate-100 rounded-xl h-10 sm:h-12 px-4 sm:px-6 md:px-8 font-semibold text-xs sm:text-sm md:text-base"
+                    className="bg-gradient-to-r from-indigo-600/20 to-indigo-400/20 border-indigo-500 text-white hover:bg-gradient-to-r hover:from-indigo-600/40 hover:to-indigo-400/40 rounded-lg h-10 sm:h-12 px-4 sm:px-6 md:px-8 font-semibold text-xs sm:text-sm md:text-base transform hover:scale-105 transition-transform duration-200"
                   >
                     <Plus className="mr-1 h-3 w-3 sm:h-4 sm:w-4 md:h-5 md:w-5" />
                     Book Your First Appointment

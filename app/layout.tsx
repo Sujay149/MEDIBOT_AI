@@ -10,7 +10,7 @@ const inter = Inter({ subsets: ["latin"] });
 export const viewport : Metadata = {
   title: "MEDIBOT_REM - AI Medical Assistant",
   description: "Your friendly AI medical assistant for health information, reminders, and guidance",
-  generator: "v0.dev",
+  generator: "Medibot",
   themeColor: "#0f172a",
 };
 

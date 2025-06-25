@@ -5,7 +5,18 @@ import Image from "next/image"
 import { usePathname } from "next/navigation"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
-import { MessageCircle, FileText, Pill, History, User, Moon, X, Plus, LogOut, Calendar } from "lucide-react"
+import {
+  MessageCircle,
+  FileText,
+  Pill,
+  History,
+  User,
+  Moon,
+  X,
+  Plus,
+  LogOut,
+  Calendar
+} from "lucide-react"
 import { useAuth } from "@/hooks/useAuth"
 import { cn } from "@/lib/utils"
 
@@ -54,12 +65,12 @@ export function Sidebar({ isOpen = true, onClose }: SidebarProps) {
           <div className="flex items-center justify-between mb-8">
             <div className="flex items-center space-x-3">
               <div className="w-8 h-8 relative">
-                <Image src="/logo.png" alt="Medibot Logo" width={32} height={32} className="rounded-full" />
+                <Image src="/logo.png" alt="MedBot Logo" width={32} height={32} className="rounded-full" />
               </div>
-              <span className="text-purple-400 font-semibold text-lg">Medibot</span>
+              <span className="text-white font-semibold text-lg">Medibot</span>
             </div>
             <div className="flex items-center space-x-2">
-              <Button variant="ghost" size="icon" className="text-slate-400 hover:text-white hover:bg-slate-800">
+              <Button variant="ghost" size="icon" className="text-slate-400 hover:text-slate-200 hover:bg-slate-800">
                 <Plus className="h-4 w-4" />
               </Button>
               {onClose && (
@@ -67,7 +78,7 @@ export function Sidebar({ isOpen = true, onClose }: SidebarProps) {
                   variant="ghost"
                   size="icon"
                   onClick={onClose}
-                  className="text-slate-400 hover:text-white hover:bg-slate-800 lg:hidden"
+                  className="text-slate-400 hover:text-slate-200 hover:bg-slate-800 lg:hidden"
                 >
                   <X className="h-4 w-4" />
                 </Button>
@@ -108,8 +119,8 @@ export function Sidebar({ isOpen = true, onClose }: SidebarProps) {
                     className={cn(
                       "w-full justify-start text-left h-12 rounded-xl transition-all duration-200",
                       isActive
-                        ? "bg-gradient-to-r from-purple-600 to-blue-600 text-white hover:from-purple-700 hover:to-blue-700 shadow-lg"
-                        : "text-slate-400 hover:text-white hover:bg-gradient-to-r hover:from-purple-600/20 hover:to-blue-600/20 hover:border-purple-500/30",
+                        ? "bg-gradient-to-r from-purple-600 to-blue-600 text-slate-200 hover:from-purple-700 hover:to-blue-700 shadow"
+                        : "text-slate-400 hover:text-slate-300 hover:bg-slate-800"
                     )}
                   >
                     <item.icon className="mr-3 h-5 w-5" />
@@ -124,7 +135,7 @@ export function Sidebar({ isOpen = true, onClose }: SidebarProps) {
           <div className="mt-auto space-y-3">
             <Button
               variant="ghost"
-              className="w-full justify-start text-slate-400 hover:text-white hover:bg-gradient-to-r hover:from-purple-600/20 hover:to-blue-600/20 hover:border-purple-500/30 rounded-xl h-12 transition-all duration-200"
+              className="w-full justify-start text-slate-400 hover:text-slate-300 hover:bg-slate-800 rounded-xl h-12 transition-all duration-200"
             >
               <Moon className="mr-3 h-5 w-5" />
               Theme: Dark
@@ -133,7 +144,7 @@ export function Sidebar({ isOpen = true, onClose }: SidebarProps) {
             <Button
               onClick={handleSignOut}
               variant="outline"
-              className="w-full justify-start bg-transparent border-slate-700 text-slate-400 hover:text-white hover:bg-gradient-to-r hover:from-red-600/20 hover:to-red-600/20 hover:border-red-500/30 rounded-xl h-12 transition-all duration-200"
+              className="w-full justify-start bg-transparent border-slate-700 text-slate-400 hover:text-red-400 hover:bg-slate-800 rounded-xl h-12 transition-all duration-200"
             >
               <LogOut className="mr-3 h-5 w-5" />
               Sign Out

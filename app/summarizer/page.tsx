@@ -352,8 +352,7 @@ export default function SummarizerPage() {
                 <FileText className="h-4 w-4 text-white" />
               </div>
               <div>
-                <h1 className="text-purple-400 font-semibold">Medical Information</h1>
-                <h2 className="text-purple-400 font-semibold">Summarizer</h2>
+                <h1 className="text-white font-semibold">Summarize Medications</h1>
               </div>
             </div>
           </div>

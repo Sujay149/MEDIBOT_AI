@@ -1,3 +1,4 @@
+
 "use client"
 
 import type React from "react"
@@ -42,7 +43,6 @@ export default function ChatPage() {
     if (!user) return
 
     const unsubscribe = subscribeToUserChatSessions(user.uid, (userSessions) => {
-      // Ensure each session has a messages array
       const normalizedSessions = userSessions.map((session) => ({
         ...session,
         messages: session.messages ?? [],
@@ -65,7 +65,10 @@ export default function ChatPage() {
   }
 
   const startNewChat = async () => {
-    if (!user) return
+    if (!user) {
+      toast.error("Please log in to start a new chat")
+      return
+    }
 
     try {
       const sessionId = await createChatSession(user.uid, "New Chat")
@@ -87,7 +90,12 @@ export default function ChatPage() {
   }
 
   const handleSendMessage = async () => {
-    if (!message.trim() || loading || !user) return
+    if (!user) {
+      toast.error("Please log in to send messages")
+      return
+    }
+
+    if (!message.trim() || loading) return
 
     const userMessage = message.trim()
     setMessage("")
@@ -188,6 +196,10 @@ export default function ChatPage() {
   }
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (!user) {
+      toast.error("Please log in to send messages")
+      return
+    }
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault()
       handleSendMessage()
@@ -195,17 +207,30 @@ export default function ChatPage() {
   }
 
   const handlePrescriptionAnalysis = () => {
+    if (!user) {
+      toast.error("Please log in to analyze prescriptions")
+      return
+    }
     setPrescriptionDialogOpen(true)
     setAnalysisResult(null)
   }
 
   const handleFileUpload = () => {
+    if (!user) {
+      toast.error("Please log in to upload files")
+      return
+    }
     fileInputRef.current?.click()
   }
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!user) {
+      toast.error("Please log in to analyze prescriptions")
+      return
+    }
+
     const file = e.target.files?.[0]
-    if (!file || !user) return
+    if (!file) return
 
     setAnalyzingPrescription(true)
 
@@ -222,7 +247,16 @@ export default function ChatPage() {
     }
   }
 
+  const handleHistoryDialog = () => {
+    if (!user) {
+      toast.error("Please log in to view chat history")
+      return
+    }
+    setHistoryDialogOpen(true)
+  }
+
   const renderMessages = () => {
+    if (!user) return null
     if (!currentSession?.messages || currentSession.messages.length === 0) {
       return null
     }
@@ -309,76 +343,119 @@ export default function ChatPage() {
                 <Image src="/logo.png" alt="Medibot Logo" width={24} height={24} className="rounded-full sm:w-8 sm:h-8" />
               </div>
               <div>
-                <h1 className="text-purple-400 font-semibold text-sm sm:text-base">Chat with</h1>
-                <h2 className="text-purple-400 font-semibold text-sm sm:text-base">Medibot</h2>
+                <h1 className="text-white font-semibold text-sm sm:text-base">Your Personalized Medibot</h1>
               </div>
             </div>
 
             <div className="flex items-center space-x-1 sm:space-x-2">
-              <Button
-                onClick={startNewChat}
-                variant="ghost"
-                size="icon"
-                className="text-slate-400 hover:text-white hover:bg-slate-800 transition-colors h-8 w-8 sm:h-10 sm:w-10"
-                title="Start New Chat"
-              >
-                <Plus className="h-4 w-4 sm:h-5 sm:w-5" />
-              </Button>
-              <Button
-                onClick={handlePrescriptionAnalysis}
-                variant="ghost"
-                size="icon"
-                className="text-slate-400 hover:text-white hover:bg-slate-800 transition-colors h-8 w-8 sm:h-10 sm:w-10"
-                title="Prescription Analysis"
-              >
-                <Camera className="h-4 w-4 sm:h-5 sm:w-5" />
-              </Button>
-              <Button
-                onClick={() => setHistoryDialogOpen(true)}
-                variant="ghost"
-                size="icon"
-                className="text-slate-400 hover:text-white hover:bg-slate-800 transition-colors h-8 w-8 sm:h-10 sm:w-10"
-                title="Chat History"
-              >
-                <RotateCcw className="h-4 w-4 sm:h-5 sm:w-5" />
-              </Button>
+              {!user ? (
+                <>
+                  <Link href="/auth/signin">
+                    <Button
+                      variant="outline"
+                      className="bg-slate-900 border-slate-700 text-white hover:bg-slate-800 text-xs sm:text-sm h-8 sm:h-10 px-2 sm:px-4"
+                    >
+                      Login
+                    </Button>
+                  </Link>
+                  <Link href="/auth/signup">
+                    <Button
+                      variant="outline"
+                      className="bg-slate-900 border-slate-700 text-white hover:bg-slate-800 text-xs sm:text-sm h-8 sm:h-10 px-2 sm:px-4"
+                    >
+                      Signup
+                    </Button>
+                  </Link>
+                </>
+              ) : (
+                <>
+                  <Button
+                    onClick={startNewChat}
+                    variant="ghost"
+                    size="icon"
+                    className="text-slate-400 hover:text-white hover:bg-slate-800 transition-colors h-8 w-8 sm:h-10 sm:w-10"
+                    title="Start New Chat"
+                  >
+                    <Plus className="h-4 w-4 sm:h-5 sm:w-5" />
+                  </Button>
+                  <Button
+                    onClick={handlePrescriptionAnalysis}
+                    variant="ghost"
+                    size="icon"
+                    className="text-slate-400 hover:text-white hover:bg-slate-800 transition-colors h-8 w-8 sm:h-10 sm:w-10"
+                    title="Prescription Analysis"
+                  >
+                    <Camera className="h-4 w-4 sm:h-5 sm:w-5" />
+                  </Button>
+                  <Button
+                    onClick={handleHistoryDialog}
+                    variant="ghost"
+                    size="icon"
+                    className="text-slate-400 hover:text-white hover:bg-slate-800 transition-colors h-8 w-8 sm:h-10 sm:w-10"
+                    title="Chat History"
+                  >
+                    <RotateCcw className="h-4 w-4 sm:h-5 sm:w-5" />
+                  </Button>
+                </>
+              )}
             </div>
           </div>
 
           <div className="flex-1 overflow-y-auto p-3 sm:p-4 md:p-6">
             <div className="max-w-full sm:max-w-3xl md:max-w-4xl mx-auto space-y-4 sm:space-y-6">
-              {(!currentSession || (currentSession.messages ?? []).length === 0) && (
-                <div className="flex items-start space-x-2 sm:space-x-4">
-                  <Avatar className="w-8 h-8 sm:w-10 sm:h-10 mt-1">
-                    <AvatarImage src="/logo.png" alt="Medibot" />
-                    <AvatarFallback className="bg-purple-600 text-white text-xs sm:text-sm font-semibold">
-                      <Image src="/logo.png" alt="M" width={20} height={20} className="rounded-full" />
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1">
-                    <p className="text-white font-medium text-xs sm:text-sm mb-1 sm:mb-2">Medibot</p>
-                    <div className="bg-slate-800 rounded-xl rounded-tl-md p-3 sm:p-4 text-slate-300 text-xs sm:text-sm leading-relaxed border border-slate-700">
-                      Hi there! I'm Medibot, your AI health assistant. 🏥 I can help with general health information,
-                      wellness tips, and guidance on when to seek medical care.
-                      <br />
-                      <br />
-                      **I can assist with:** symptoms information, medication guidance, lifestyle advice, and health
-                      education.
-                      <br />
-                      <br />
-                      **Remember:** I provide educational information only - always consult healthcare professionals for
-                      medical advice, diagnosis, or treatment.
-                      <br />
-                      <br />
-                      What health questions can I help you with today?
+              {!user ? (
+                <div className="min-h-full flex items-center justify-center">
+                  <div className="w-full max-w-md text-center space-y-8">
+                    <div className="flex flex-col items-center space-y-6">
+                      <div className="w-20 h-20 relative">
+                        <Image src="/logo.png" alt="Medibot Logo" width={80} height={80} className="rounded-full" />
+                      </div>
+                      <div>
+                        <h1 className="text-3xl font-bold text-white mb-3">Welcome to Medibot</h1>
+                        <p className="text-slate-400 text-sm">Please log in or sign up to start chatting.</p>
+                      </div>
+                    </div>
+                    <div className="space-y-4">
+                      <Link href="/auth/signin" className="block">
+                        <Button
+                          variant="outline"
+                          className="w-full h-12 bg-slate-900 border-slate-700 text-white hover:bg-slate-800 rounded-xl"
+                        >
+                          Login
+                        </Button>
+                      </Link>
+                      <Link href="/auth/signup" className="block">
+                        <Button
+                          variant="outline"
+                          className="w-full h-12 bg-slate-900 border-slate-700 text-white hover:bg-slate-800 rounded-xl"
+                        >
+                          Signup
+                        </Button>
+                      </Link>
                     </div>
                   </div>
                 </div>
+              ) : (!currentSession || (currentSession.messages ?? []).length === 0) ? (
+                <div className="min-h-full flex items-center justify-center">
+                  <div className="w-full max-w-md text-center space-y-8">
+                    <div className="flex flex-col items-center space-y-6">
+                      <div className="w-20 h-20 relative">
+                        <Image src="/logo.png" alt="Medibot Logo" width={80} height={80} className="rounded-full" />
+                      </div>
+                      <div>
+                        <h1 className="text-3xl font-bold text-white mb-3">Welcome to Medibot</h1>
+                        <p className="text-slate-400 text-sm">Start a conversation below.</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  {renderMessages()}
+                </>
               )}
 
-              {renderMessages()}
-
-              {loading && (
+              {loading && user && (
                 <div className="flex items-start space-x-2 sm:space-x-4">
                   <Avatar className="w-8 h-8 sm:w-10 sm:h-10 mt-1">
                     <AvatarImage src="/logo.png" alt="Medibot" />
@@ -409,244 +486,250 @@ export default function ChatPage() {
             </div>
           </div>
 
-          <div className="p-3 sm:p-4 md:p-6 border-t border-slate-800 bg-slate-900 sticky bottom-0">
-            <div className="max-w-full sm:max-w-3xl md:max-w-4xl mx-auto">
-              <div className="flex items-center space-x-2 sm:space-x-3">
-                <div className="flex-1 relative">
-                  <Input
-                    value={message}
-                    onChange={(e) => setMessage(e.target.value)}
-                    onKeyPress={handleKeyPress}
-                    placeholder="Ask a health question..."
-                    className="bg-slate-800 border-slate-700 text-white placeholder-slate-400 h-10 sm:h-11 md:h-12 rounded-xl pr-10 sm:pr-12 text-xs sm:text-sm md:text-base"
-                    disabled={loading}
-                    maxLength={1000}
-                  />
+          {user && (
+            <div className="p-3 sm:p-4 md:p-6 border-t border-slate-800 bg-slate-900 sticky bottom-0">
+              <div className="max-w-full sm:max-w-3xl md:max-w-4xl mx-auto">
+                <div className="flex items-center space-x-2 sm:space-x-3">
+                  <div className="flex-1 relative">
+                    <Input
+                      value={message}
+                      onChange={(e) => setMessage(e.target.value)}
+                      onKeyPress={handleKeyPress}
+                      placeholder="Ask a health question..."
+                      className="bg-slate-800 border-slate-700 text-white placeholder-slate-400 h-10 sm:h-11 md:h-12 rounded-xl pr-10 sm:pr-12 text-xs sm:text-sm md:text-base"
+                      disabled={loading}
+                      maxLength={1000}
+                    />
+                  </div>
+                  <Button
+                    onClick={handleSendMessage}
+                    disabled={loading || !message.trim()}
+                    size="icon"
+                    className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white rounded-full h-10 w-10 sm:h-11 sm:w-11 md:h-12 md:w-12 shadow-lg disabled:opacity-50"
+                  >
+                    <Send className="h-4 w-4 sm:h-5 sm:w-5" />
+                  </Button>
                 </div>
-                <Button
-                  onClick={handleSendMessage}
-                  disabled={loading || !message.trim()}
-                  size="icon"
-                  className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white rounded-full h-10 w-10 sm:h-11 sm:w-11 md:h-12 md:w-12 shadow-lg disabled:opacity-50"
-                >
-                  <Send className="h-4 w-4 sm:h-5 sm:w-5" />
-                </Button>
               </div>
             </div>
-          </div>
+          )}
         </div>
 
-        <Dialog open={prescriptionDialogOpen} onOpenChange={setPrescriptionDialogOpen}>
-          <DialogContent className="bg-slate-900 border-slate-800 text-white max-w-[90vw] sm:max-w-2xl mx-auto max-h-[90vh] sm:max-h-[80vh] overflow-y-auto sm:rounded-lg p-4 sm:p-6">
-            <DialogHeader>
-              <DialogTitle className="flex items-center space-x-2 text-sm sm:text-base">
-                <Camera className="h-4 w-4 sm:h-5 sm:w-5" />
-                <span>Prescription Analysis</span>
-              </DialogTitle>
-            </DialogHeader>
+        {user && (
+          <>
+            <Dialog open={prescriptionDialogOpen} onOpenChange={setPrescriptionDialogOpen}>
+              <DialogContent className="bg-slate-900 border-slate-800 text-white max-w-[90vw] sm:max-w-2xl mx-auto max-h-[90vh] sm:max-h-[80vh] overflow-y-auto sm:rounded-lg p-4 sm:p-6">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center space-x-2 text-sm sm:text-base">
+                    <Camera className="h-4 w-4 sm:h-5 sm:w-5" />
+                    <span>Prescription Analysis</span>
+                  </DialogTitle>
+                </DialogHeader>
 
-            {!analysisResult ? (
-              <div className="space-y-3 sm:space-y-4">
-                <p className="text-slate-400 text-xs sm:text-sm">
-                  Upload a photo of your prescription for AI-powered analysis and information.
-                </p>
+                {!analysisResult ? (
+                  <div className="space-y-3 sm:space-y-4">
+                    <p className="text-slate-400 text-xs sm:text-sm">
+                      Upload a photo of your prescription for AI-powered analysis and information.
+                    </p>
 
-                <div className="border-2 border-dashed border-slate-700 rounded-lg p-6 sm:p-8 text-center">
-                  {analyzingPrescription ? (
-                    <div className="space-y-3 sm:space-y-4">
-                      <div className="w-10 h-10 sm:w-12 sm:h-12 border-4 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
-                      <p className="text-slate-400 text-xs sm:text-sm">Analyzing prescription...</p>
+                    <div className="border-2 border-dashed border-slate-700 rounded-lg p-6 sm:p-8 text-center">
+                      {analyzingPrescription ? (
+                        <div className="space-y-3 sm:space-y-4">
+                          <div className="w-10 h-10 sm:w-12 sm:h-12 border-4 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
+                          <p className="text-slate-400 text-xs sm:text-sm">Analyzing prescription...</p>
+                        </div>
+                      ) : (
+                        <>
+                          <Camera className="h-10 w-10 sm:h-12 sm:w-12 text-slate-400 mx-auto mb-3 sm:mb-4" />
+                          <p className="text-slate-400 text-xs sm:text-sm mb-3 sm:mb-4">Upload prescription image</p>
+                          <Button
+                            onClick={handleFileUpload}
+                            className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-xs sm:text-sm"
+                          >
+                            <Upload className="mr-1 h-3 w-3 sm:h-4 sm:w-4" />
+                            Choose File
+                          </Button>
+                        </>
+                      )}
                     </div>
-                  ) : (
-                    <>
-                      <Camera className="h-10 w-10 sm:h-12 sm:w-12 text-slate-400 mx-auto mb-3 sm:mb-4" />
-                      <p className="text-slate-400 text-xs sm:text-sm mb-3 sm:mb-4">Upload prescription image</p>
+
+                    <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
+
+                    <p className="text-xs text-slate-500">
+                      Supported formats: JPG, PNG, HEIC. This feature analyzes prescription information for educational
+                      purposes only.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-4 sm:space-y-6">
+                    <Card className="bg-slate-800 border-slate-700">
+                      <CardHeader>
+                        <CardTitle className="text-white flex items-center space-x-2 text-sm sm:text-base">
+                          <FileText className="h-4 w-4 sm:h-5 sm:w-5" />
+                          <span>Analysis Results</span>
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-3 sm:space-y-4">
+                        <div className="grid grid-cols-1 gap-3 sm:gap-4">
+                          <div>
+                            <h4 className="text-white font-medium text-xs sm:text-sm mb-1 sm:mb-2">Detected Medications</h4>
+                            <div className="space-y-1 sm:space-y-2 flex flex-wrap gap-1">
+                              {analysisResult.medications.map((med, index) => (
+                                <Badge key={index} className="bg-purple-600 text-white text-xs sm:text-sm mr-1 mb-1">
+                                  <Pill className="mr-1 h-3 w-3 sm:h-3 sm:w-3" />
+                                  {med}
+                                </Badge>
+                              ))}
+                            </div>
+                          </div>
+
+                          <div>
+                            <h4 className="text-white font-medium text-xs sm:text-sm mb-1 sm:mb-2">Dosage Information</h4>
+                            <div className="space-y-1 sm:space-y-2 flex flex-wrap gap-1">
+                              {analysisResult.dosages.map((dosage, index) => (
+                                <Badge
+                                  key={index}
+                                  variant="secondary"
+                                  className="bg-slate-700 text-slate-300 text-xs sm:text-sm mr-1 mb-1"
+                                >
+                                  {dosage}
+                                </Badge>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div>
+                          <h4 className="text-white font-medium text-xs sm:text-sm mb-1 sm:mb-2">Instructions</h4>
+                          <p className="text-slate-300 text-xs sm:text-sm bg-slate-700 p-2 sm:p-3 rounded-lg">
+                            {analysisResult.instructions}
+                          </p>
+                        </div>
+
+                        {analysisResult.warnings?.length > 0 && (
+                          <div>
+                            <h4 className="text-white font-medium text-xs sm:text-sm mb-1 sm:mb-2 flex items-center">
+                              <AlertCircle className="mr-1 h-4 w-4 sm:h-5 sm:w-5 text-yellow-500" />
+                              <span>Warnings & Precautions</span>
+                            </h4>
+                            <div className="space-y-1 sm:space-y-2">
+                              {analysisResult.warnings.map((warning, index) => (
+                                <div key={index} className="bg-yellow-900/20 border border-yellow-700 p-2 sm:p-3 rounded-lg">
+                                  <p className="text-yellow-300 text-xs sm:text-sm">{warning}</p>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="bg-blue-900/20 border border-blue-700 p-3 sm:p-4 rounded-lg">
+                          <p className="text-blue-300 text-xs sm:text-sm">
+                            <strong>Important:</strong> This analysis is for informational purposes only. Always follow your
+                            doctor's instructions and consult your pharmacist for any questions about your medications.
+                          </p>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3">
                       <Button
-                        onClick={handleFileUpload}
-                        className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-xs sm:text-sm"
+                        onClick={() => {
+                          setAnalysisResult(null)
+                          setPrescriptionDialogOpen(false)
+                        }}
+                        variant="outline"
+                        className="flex-1 border-slate-700 text-slate-400 hover:text-white text-xs sm:text-sm"
                       >
-                        <Upload className="mr-1 h-3 w-3 sm:h-4 sm:w-4" />
-                        Choose File
+                        Close
                       </Button>
-                    </>
+                      <Button
+                        onClick={() => setAnalysisResult(null)}
+                        className="flex-1 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-xs sm:text-sm"
+                      >
+                        Analyze Another
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </DialogContent>
+            </Dialog>
+
+            <Dialog open={historyDialogOpen} onOpenChange={setHistoryDialogOpen}>
+              <DialogContent className="bg-slate-900 border-slate-800 text-white max-w-[90vw] sm:max-w-2xl mx-auto max-h-[90vh] sm:max-h-[80vh] overflow-hidden sm:rounded-lg p-4 sm:p-6">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center justify-between text-sm sm:text-base">
+                    <div className="flex items-center space-x-2">
+                      <RotateCcw className="h-4 w-4 sm:h-5 sm:w-5" />
+                      <span>Recent Chats</span>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setHistoryDialogOpen(false)}
+                      className="text-slate-400 hover:text-white h-8 w-8 sm:h-10 sm:w-10"
+                    >
+                      <X className="h-3 w-3 sm:h-4 sm:w-4" />
+                    </Button>
+                  </DialogTitle>
+                </DialogHeader>
+
+                <div className="space-y-3 sm:space-y-4 overflow-y-auto max-h-80 sm:max-h-96">
+                  {sessions.length > 0 ? (
+                    sessions.slice(0, 10).map((session) => (
+                      <div
+                        key={session.id}
+                        className={`p-3 sm:p-4 rounded-lg border cursor-pointer transition-colors ${
+                          currentSession?.id === session.id
+                            ? "bg-purple-600/20 border-purple-600"
+                            : "bg-slate-800 border-slate-700 hover:bg-slate-700"
+                        }`}
+                        onClick={() => {
+                          setCurrentSession(session)
+                          setHistoryDialogOpen(false)
+                        }}
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <h3 className="text-white font-medium text-xs sm:text-sm truncate">{session.title}</h3>
+                            <p className="text-slate-400 text-xs sm:text-sm">
+                              {(session.messages ?? []).length} messages •{" "}
+                              {session.updatedAt instanceof Date
+                                ? session.updatedAt.toLocaleDateString()
+                                : (session.updatedAt as any)?.toDate?.()?.toLocaleDateString() || "Recently"}
+                            </p>
+                            {(session.messages ?? []).length > 0 && (
+                              <p className="text-slate-500 text-xs sm:text-sm mt-1 truncate">
+                                {session.messages[session.messages.length - 1]?.message ?? "No messages"}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center py-6 sm:py-8">
+                      <RotateCcw className="h-10 w-10 sm:h-12 sm:w-12 text-slate-600 mx-auto mb-3 sm:mb-4" />
+                      <p className="text-slate-400 text-xs sm:text-sm">No chat history yet</p>
+                      <p className="text-slate-500 text-xs sm:text-sm">Start a conversation to see your history here</p>
+                    </div>
                   )}
                 </div>
 
-                <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
-
-                <p className="text-xs text-slate-500">
-                  Supported formats: JPG, PNG, HEIC. This feature analyzes prescription information for educational
-                  purposes only.
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-4 sm:space-y-6">
-                <Card className="bg-slate-800 border-slate-700">
-                  <CardHeader>
-                    <CardTitle className="text-white flex items-center space-x-2 text-sm sm:text-base">
-                      <FileText className="h-4 w-4 sm:h-5 sm:w-5" />
-                      <span>Analysis Results</span>
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-3 sm:space-y-4">
-                    <div className="grid grid-cols-1 gap-3 sm:gap-4">
-                      <div>
-                        <h4 className="text-white font-medium text-xs sm:text-sm mb-1 sm:mb-2">Detected Medications</h4>
-                        <div className="space-y-1 sm:space-y-2 flex flex-wrap gap-1">
-                          {analysisResult.medications.map((med, index) => (
-                            <Badge key={index} className="bg-purple-600 text-white text-xs sm:text-sm mr-1 mb-1">
-                              <Pill className="mr-1 h-3 w-3 sm:h-3 sm:w-3" />
-                              {med}
-                            </Badge>
-                          ))}
-                        </div>
-                      </div>
-
-                      <div>
-                        <h4 className="text-white font-medium text-xs sm:text-sm mb-1 sm:mb-2">Dosage Information</h4>
-                        <div className="space-y-1 sm:space-y-2 flex flex-wrap gap-1">
-                          {analysisResult.dosages.map((dosage, index) => (
-                            <Badge
-                              key={index}
-                              variant="secondary"
-                              className="bg-slate-700 text-slate-300 text-xs sm:text-sm mr-1 mb-1"
-                            >
-                              {dosage}
-                            </Badge>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div>
-                      <h4 className="text-white font-medium text-xs sm:text-sm mb-1 sm:mb-2">Instructions</h4>
-                      <p className="text-slate-300 text-xs sm:text-sm bg-slate-700 p-2 sm:p-3 rounded-lg">
-                        {analysisResult.instructions}
-                      </p>
-                    </div>
-
-                    {analysisResult.warnings?.length > 0 && (
-                      <div>
-                        <h4 className="text-white font-medium text-xs sm:text-sm mb-1 sm:mb-2 flex items-center">
-                          <AlertCircle className="mr-1 h-3 w-3 sm:h-4 sm:w-4 text-yellow-500" />
-                          Warnings & Precautions
-                        </h4>
-                        <div className="space-y-1 sm:space-y-2">
-                          {analysisResult.warnings.map((warning, index) => (
-                            <div key={index} className="bg-yellow-900/20 border border-yellow-700 p-2 sm:p-3 rounded-lg">
-                              <p className="text-yellow-300 text-xs sm:text-sm">{warning}</p>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="bg-blue-900/20 border border-blue-700 p-3 sm:p-4 rounded-lg">
-                      <p className="text-blue-300 text-xs sm:text-sm">
-                        <strong>Important:</strong> This analysis is for informational purposes only. Always follow your
-                        doctor's instructions and consult your pharmacist for any questions about your medications.
-                      </p>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3">
-                  <Button
-                    onClick={() => {
-                      setAnalysisResult(null)
-                      setPrescriptionDialogOpen(false)
-                    }}
-                    variant="outline"
-                    className="flex-1 border-slate-700 text-slate-400 hover:text-white text-xs sm:text-sm"
-                  >
-                    Close
-                  </Button>
-                  <Button
-                    onClick={() => setAnalysisResult(null)}
-                    className="flex-1 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-xs sm:text-sm"
-                  >
-                    Analyze Another
-                  </Button>
+                <div className="flex justify-end pt-3 sm:pt-4 border-t border-slate-800">
+                  <Link href="/history">
+                    <Button
+                      variant="outline"
+                      className="border-slate-700 text-slate-400 hover:text-white text-xs sm:text-sm"
+                      onClick={() => setHistoryDialogOpen(false)}
+                    >
+                      View Full History
+                    </Button>
+                  </Link>
                 </div>
-              </div>
-            )}
-          </DialogContent>
-        </Dialog>
-
-        <Dialog open={historyDialogOpen} onOpenChange={setHistoryDialogOpen}>
-          <DialogContent className="bg-slate-900 border-slate-800 text-white max-w-[90vw] sm:max-w-2xl mx-auto max-h-[90vh] sm:max-h-[80vh] overflow-hidden sm:rounded-lg p-4 sm:p-6">
-            <DialogHeader>
-              <DialogTitle className="flex items-center justify-between text-sm sm:text-base">
-                <div className="flex items-center space-x-2">
-                  <RotateCcw className="h-4 w-4 sm:h-5 sm:w-5" />
-                  <span>Recent Chats</span>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setHistoryDialogOpen(false)}
-                  className="text-slate-400 hover:text-white h-8 w-8 sm:h-10 sm:w-10"
-                >
-                  <X className="h-3 w-3 sm:h-4 sm:w-4" />
-                </Button>
-              </DialogTitle>
-            </DialogHeader>
-
-            <div className="space-y-3 sm:space-y-4 overflow-y-auto max-h-80 sm:max-h-96">
-              {sessions.length > 0 ? (
-                sessions.slice(0, 10).map((session) => (
-                  <div
-                    key={session.id}
-                    className={`p-3 sm:p-4 rounded-lg border cursor-pointer transition-colors ${
-                      currentSession?.id === session.id
-                        ? "bg-purple-600/20 border-purple-600"
-                        : "bg-slate-800 border-slate-700 hover:bg-slate-700"
-                    }`}
-                    onClick={() => {
-                      setCurrentSession(session)
-                      setHistoryDialogOpen(false)
-                    }}
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <h3 className="text-white font-medium text-xs sm:text-sm truncate">{session.title}</h3>
-                        <p className="text-slate-400 text-xs sm:text-sm">
-                          {(session.messages ?? []).length} messages •{" "}
-                          {session.updatedAt instanceof Date
-                            ? session.updatedAt.toLocaleDateString()
-                            : (session.updatedAt as any)?.toDate?.()?.toLocaleDateString() || "Recently"}
-                        </p>
-                        {(session.messages ?? []).length > 0 && (
-                          <p className="text-slate-500 text-xs sm:text-sm mt-1 truncate">
-                            {session.messages[session.messages.length - 1]?.message ?? "No messages"}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="text-center py-6 sm:py-8">
-                  <RotateCcw className="h-10 w-10 sm:h-12 sm:w-12 text-slate-600 mx-auto mb-3 sm:mb-4" />
-                  <p className="text-slate-400 text-xs sm:text-sm">No chat history yet</p>
-                  <p className="text-slate-500 text-xs sm:text-sm">Start a conversation to see your history here</p>
-                </div>
-              )}
-            </div>
-
-            <div className="flex justify-end pt-3 sm:pt-4 border-t border-slate-800">
-              <Link href="/history">
-                <Button
-                  variant="outline"
-                  className="border-slate-700 text-slate-400 hover:text-white text-xs sm:text-sm"
-                  onClick={() => setHistoryDialogOpen(false)}
-                >
-                  View Full History
-                </Button>
-              </Link>
-            </div>
-          </DialogContent>
-        </Dialog>
+              </DialogContent>
+            </Dialog>
+          </>
+        )}
       </div>
     </AuthGuard>
   )

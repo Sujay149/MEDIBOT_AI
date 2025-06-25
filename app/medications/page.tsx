@@ -354,7 +354,7 @@ export default function MedicationsPage() {
               <div className="w-8 h-8 relative">
                 <Image src="/logo.png" alt="Medibot Logo" width={32} height={32} className="rounded-full" />
               </div>
-              <span className="text-purple-400 font-semibold text-lg">My Medications</span>
+              <span className="text-purple-400 font-semibold text-lg"> Medications</span>
             </div>
 
             <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
@@ -536,7 +536,7 @@ export default function MedicationsPage() {
           <div className="flex-1 p-4 sm:p-6 overflow-y-auto">
             <div className="max-w-4xl mx-auto">
               <div className="mb-6 sm:mb-8">
-                <h1 className="text-2xl sm:text-3xl font-bold text-white mb-2 sm:mb-3">My Medications</h1>
+                <h1 className="text-2xl sm:text-3xl font-bold text-white mb-2 sm:mb-3">You may forgot But Medibot Never Forgets...</h1>
                 <p className="text-slate-400">Manage your prescriptions and set reminders</p>
               </div>
 

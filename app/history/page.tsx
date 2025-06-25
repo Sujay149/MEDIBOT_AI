@@ -146,7 +146,7 @@ export default function HistoryPage() {
           <div className="flex-1 px-4 py-5 xs:px-5 xs:py-6 overflow-y-auto w-full">
             <div className="max-w-full xs:max-w-2xl sm:max-w-3xl md:max-w-4xl mx-auto space-y-5 xs:space-y-6">
               <div>
-                <h1 className="text-xl xs:text-2xl font-bold text-white mb-2 xs:mb-3">Chat History</h1>
+                <h1 className="text-xl xs:text-2xl font-bold text-white mb-2 xs:mb-3">Rememorize Your chats...</h1>
                 <p className="text-slate-400 text-sm xs:text-base">View and manage your conversations</p>
               </div>
 
