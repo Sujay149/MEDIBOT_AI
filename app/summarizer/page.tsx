@@ -510,7 +510,13 @@ export default function SummarizerPage() {
                               {summary.category.charAt(0).toUpperCase() + summary.category.slice(1)}
                             </Badge>
                             <span className="text-slate-500 text-xs">
-                              {summary.createdAt?.toDate?.()?.toLocaleDateString() || "Recently"}
+                              {(
+                                summary.createdAt
+                                  ? (typeof summary.createdAt === "object" && "toDate" in summary.createdAt
+                                      ? (summary.createdAt as any).toDate().toLocaleDateString()
+                                      : (summary.createdAt as Date).toLocaleDateString())
+                                  : "Recently"
+                              )}
                             </span>
                           </div>
                           <p className="text-slate-300 text-sm line-clamp-2 mb-2">

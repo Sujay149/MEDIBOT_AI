@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-
 import { useState, useEffect, useRef } from "react"
 import Image from "next/image"
 import { Sidebar } from "@/components/sidebar"
@@ -43,13 +42,18 @@ export default function ChatPage() {
     if (!user) return
 
     const unsubscribe = subscribeToUserChatSessions(user.uid, (userSessions) => {
-      setSessions(userSessions)
-      if (!currentSession && userSessions.length > 0) {
-        setCurrentSession(userSessions[0])
+      // Ensure each session has a messages array
+      const normalizedSessions = userSessions.map((session) => ({
+        ...session,
+        messages: session.messages ?? [],
+      }))
+      setSessions(normalizedSessions)
+      if (!currentSession && normalizedSessions.length > 0) {
+        setCurrentSession(normalizedSessions[0])
       }
     })
 
-    return unsubscribe
+    return () => unsubscribe()
   }, [user, currentSession])
 
   useEffect(() => {
@@ -92,7 +96,6 @@ export default function ChatPage() {
     try {
       let sessionToUse = currentSession
 
-      // Create new session if none exists with smart title
       if (!sessionToUse) {
         const smartTitle = generateChatTitle(userMessage)
         const sessionId = await createChatSession(user.uid, smartTitle)
@@ -107,24 +110,20 @@ export default function ChatPage() {
         setCurrentSession(sessionToUse)
       }
 
-      // Generate AI response
       const botResponse = await generateAIResponse(userMessage)
 
-      // Add message to Firestore
       if (sessionToUse.id) {
         const newMessage = await addMessageToSession(sessionToUse.id, user.uid, userMessage, botResponse, "chat")
 
-        // Immediately update local state for instant display
         setCurrentSession((prev) => {
           if (!prev) return prev
           return {
             ...prev,
-            messages: [...prev.messages, newMessage],
+            messages: [...(prev.messages ?? []), newMessage],
             updatedAt: new Date(),
           }
         })
 
-        // Send notification
         sendMessageNotification(userMessage, botResponse)
         toast.success("Message sent!")
       }
@@ -139,43 +138,22 @@ export default function ChatPage() {
 
   const generateChatTitle = (firstMessage: string): string => {
     const lowerMessage = firstMessage.toLowerCase()
+    if (lowerMessage.includes("headache") || lowerMessage.includes("migraine")) return "Headache Consultation"
+    if (lowerMessage.includes("fever") || lowerMessage.includes("temperature")) return "Fever Assessment"
+    if (lowerMessage.includes("medication") || lowerMessage.includes("medicine")) return "Medication Inquiry"
+    if (lowerMessage.includes("diet") || lowerMessage.includes("nutrition")) return "Nutrition Guidance"
+    if (lowerMessage.includes("exercise") || lowerMessage.includes("workout")) return "Exercise Consultation"
+    if (lowerMessage.includes("sleep") || lowerMessage.includes("insomnia")) return "Sleep Health"
+    if (lowerMessage.includes("stress") || lowerMessage.includes("anxiety")) return "Mental Health Support"
+    if (lowerMessage.includes("pain")) return "Pain Management"
 
-    if (lowerMessage.includes("headache") || lowerMessage.includes("migraine")) {
-      return "Headache Consultation"
-    }
-    if (lowerMessage.includes("fever") || lowerMessage.includes("temperature")) {
-      return "Fever Assessment"
-    }
-    if (lowerMessage.includes("medication") || lowerMessage.includes("medicine")) {
-      return "Medication Inquiry"
-    }
-    if (lowerMessage.includes("diet") || lowerMessage.includes("nutrition")) {
-      return "Nutrition Guidance"
-    }
-    if (lowerMessage.includes("exercise") || lowerMessage.includes("workout")) {
-      return "Exercise Consultation"
-    }
-    if (lowerMessage.includes("sleep") || lowerMessage.includes("insomnia")) {
-      return "Sleep Health"
-    }
-    if (lowerMessage.includes("stress") || lowerMessage.includes("anxiety")) {
-      return "Mental Health Support"
-    }
-    if (lowerMessage.includes("pain")) {
-      return "Pain Management"
-    }
-
-    // Extract key words for generic titles
     const words = firstMessage.split(" ").filter((word) => word.length > 3)
-    if (words.length > 0) {
-      return `${words[0].charAt(0).toUpperCase() + words[0].slice(1)} Discussion`
-    }
+    if (words.length > 0) return `${words[0].charAt(0).toUpperCase() + words[0].slice(1)} Discussion`
 
     return "Health Consultation"
   }
 
   const sendMessageNotification = (userMessage: string, botResponse: string) => {
-    // Browser notification
     if ("Notification" in window && Notification.permission === "granted") {
       new Notification("Medibot Response", {
         body: "Your health question has been answered",
@@ -187,7 +165,6 @@ export default function ChatPage() {
 
   const generateAIResponse = async (userMessage: string): Promise<string> => {
     await new Promise((resolve) => setTimeout(resolve, 1000 + Math.random() * 2000))
-
     const lowerMessage = userMessage.toLowerCase()
 
     if (lowerMessage.includes("headache") || lowerMessage.includes("migraine")) {
@@ -233,12 +210,9 @@ export default function ChatPage() {
     setAnalyzingPrescription(true)
 
     try {
-      // Simulate prescription analysis
       await new Promise((resolve) => setTimeout(resolve, 3000))
-
       const analysis = await analyzePrescription(user.uid, file.name, "Prescription uploaded for analysis")
       setAnalysisResult(analysis)
-
       toast.success("Prescription analyzed successfully!")
     } catch (error) {
       console.error("Error analyzing prescription:", error)
@@ -274,18 +248,21 @@ export default function ChatPage() {
     })
 
     return allMessages.map((msg) => (
-      <div key={msg.id} className={`flex ${msg.type === "user" ? "justify-end" : "items-start space-x-4"} mb-4`}>
+      <div
+        key={msg.id}
+        className={`flex ${msg.type === "user" ? "justify-end" : "items-start space-x-2 sm:space-x-3"} mb-3 sm:mb-4`}
+      >
         {msg.type === "bot" && (
           <>
-            <Avatar className="w-10 h-10 mt-1 flex-shrink-0">
+            <Avatar className="w-8 h-8 sm:w-10 sm:h-10 mt-1 flex-shrink-0">
               <AvatarImage src="/logo.png" alt="Medibot" />
-              <AvatarFallback className="bg-purple-600 text-white text-sm font-semibold">
-                <Image src="/logo.png" alt="M" width={24} height={24} className="rounded-full" />
+              <AvatarFallback className="bg-purple-600 text-white text-xs sm:text-sm font-semibold">
+                <Image src="/logo.png" alt="M" width={20} height={20} className="rounded-full" />
               </AvatarFallback>
             </Avatar>
-            <div className="flex-1 max-w-3xl">
-              <p className="text-white font-medium mb-2">Medibot</p>
-              <div className="bg-slate-800 rounded-2xl rounded-tl-md p-4 text-slate-300 leading-relaxed border border-slate-700 whitespace-pre-wrap">
+            <div className="flex-1 max-w-[80%] sm:max-w-3xl">
+              <p className="text-white font-medium text-xs sm:text-sm mb-1 sm:mb-2">Medibot</p>
+              <div className="bg-slate-800 rounded-xl rounded-tl-md p-3 sm:p-4 text-slate-300 text-xs sm:text-sm leading-relaxed border border-slate-700 whitespace-pre-wrap">
                 {msg.content}
               </div>
             </div>
@@ -293,13 +270,13 @@ export default function ChatPage() {
         )}
 
         {msg.type === "user" && (
-          <div className="flex items-start space-x-3 max-w-xs sm:max-w-md lg:max-w-lg">
-            <div className="bg-gradient-to-r from-purple-600 to-blue-600 rounded-2xl rounded-tr-md p-4 text-white leading-relaxed">
+          <div className="flex items-start space-x-2 sm:space-x-3 max-w-[70%] sm:max-w-md">
+            <div className="bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl rounded-tr-md p-3 sm:p-4 text-white text-xs sm:text-sm leading-relaxed">
               {msg.content}
             </div>
-            <Avatar className="w-8 h-8 mt-1 flex-shrink-0">
+            <Avatar className="w-6 h-6 sm:w-8 sm:h-8 mt-1 flex-shrink-0">
               <AvatarImage src={userProfile?.photoURL || user?.photoURL || ""} />
-              <AvatarFallback className="bg-slate-600 text-white text-sm">
+              <AvatarFallback className="bg-slate-600 text-white text-xs sm:text-sm">
                 {userProfile?.displayName?.charAt(0).toUpperCase() ||
                   user?.displayName?.charAt(0).toUpperCase() ||
                   user?.email?.charAt(0).toUpperCase() ||
@@ -314,77 +291,73 @@ export default function ChatPage() {
 
   return (
     <AuthGuard>
-      <div className="flex h-screen bg-slate-950">
+      <div className="flex h-screen bg-slate-950 overflow-hidden">
         <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
         <div className="flex-1 flex flex-col">
-          {/* Header */}
-          <div className="flex items-center justify-between p-4 border-b border-slate-800 bg-slate-900">
-            <div className="flex items-center space-x-3">
+          <div className="flex items-center justify-between p-3 sm:p-4 border-b border-slate-800 bg-slate-900">
+            <div className="flex items-center space-x-2 sm:space-x-3">
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={() => setSidebarOpen(true)}
                 className="text-slate-400 hover:text-white lg:hidden"
               >
-                <Menu className="h-5 w-5" />
+                <Menu className="h-4 w-4 sm:h-5 sm:w-5" />
               </Button>
-              <div className="w-8 h-8 relative">
-                <Image src="/logo.png" alt="MedBot Logo" width={32} height={32} className="rounded-full" />
+              <div className="w-6 h-6 sm:w-8 sm:h-8 relative">
+                <Image src="/logo.png" alt="MedBot Logo" width={24} height={24} className="rounded-full sm:w-8 sm:h-8" />
               </div>
               <div>
-                <h1 className="text-purple-400 font-semibold">Chat with</h1>
-                <h2 className="text-purple-400 font-semibold">Medibot</h2>
+                <h1 className="text-purple-400 font-semibold text-sm sm:text-base">Chat with</h1>
+                <h2 className="text-purple-400 font-semibold text-sm sm:text-base">Medibot</h2>
               </div>
             </div>
 
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-1 sm:space-x-2">
               <Button
                 onClick={startNewChat}
                 variant="ghost"
                 size="icon"
-                className="text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+                className="text-slate-400 hover:text-white hover:bg-slate-800 transition-colors h-8 w-8 sm:h-10 sm:w-10"
                 title="Start New Chat"
               >
-                <Plus className="h-5 w-5" />
+                <Plus className="h-4 w-4 sm:h-5 sm:w-5" />
               </Button>
-
               <Button
                 onClick={handlePrescriptionAnalysis}
                 variant="ghost"
                 size="icon"
-                className="text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+                className="text-slate-400 hover:text-white hover:bg-slate-800 transition-colors h-8 w-8 sm:h-10 sm:w-10"
                 title="Prescription Analysis"
               >
-                <Camera className="h-5 w-5" />
+                <Camera className="h-4 w-4 sm:h-5 sm:w-5" />
               </Button>
-
               <Button
                 onClick={() => setHistoryDialogOpen(true)}
                 variant="ghost"
                 size="icon"
-                className="text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+                className="text-slate-400 hover:text-white hover:bg-slate-800 transition-colors h-8 w-8 sm:h-10 sm:w-10"
                 title="Chat History"
               >
-                <RotateCcw className="h-5 w-5" />
+                <RotateCcw className="h-4 w-4 sm:h-5 sm:w-5" />
               </Button>
             </div>
           </div>
 
-          {/* Chat Messages */}
-          <div className="flex-1 overflow-y-auto p-4 sm:p-6">
-            <div className="max-w-4xl mx-auto space-y-6">
-              {(!currentSession || currentSession.messages.length === 0) && (
-                <div className="flex items-start space-x-4">
-                  <Avatar className="w-10 h-10 mt-1">
+          <div className="flex-1 overflow-y-auto p-3 sm:p-4 md:p-6">
+            <div className="max-w-full sm:max-w-3xl md:max-w-4xl mx-auto space-y-4 sm:space-y-6">
+              {(!currentSession || (currentSession.messages ?? []).length === 0) && (
+                <div className="flex items-start space-x-2 sm:space-x-4">
+                  <Avatar className="w-8 h-8 sm:w-10 sm:h-10 mt-1">
                     <AvatarImage src="/logo.png" alt="Medibot" />
-                    <AvatarFallback className="bg-purple-600 text-white text-sm font-semibold">
-                      <Image src="/logo.png" alt="M" width={24} height={24} className="rounded-full" />
+                    <AvatarFallback className="bg-purple-600 text-white text-xs sm:text-sm font-semibold">
+                      <Image src="/logo.png" alt="M" width={20} height={20} className="rounded-full" />
                     </AvatarFallback>
                   </Avatar>
                   <div className="flex-1">
-                    <p className="text-white font-medium mb-2">Medibot</p>
-                    <div className="bg-slate-800 rounded-2xl rounded-tl-md p-4 text-slate-300 leading-relaxed border border-slate-700">
+                    <p className="text-white font-medium text-xs sm:text-sm mb-1 sm:mb-2">Medibot</p>
+                    <div className="bg-slate-800 rounded-xl rounded-tl-md p-3 sm:p-4 text-slate-300 text-xs sm:text-sm leading-relaxed border border-slate-700">
                       Hi there! I'm Medibot, your AI health assistant. 🏥 I can help with general health information,
                       wellness tips, and guidance on when to seek medical care.
                       <br />
@@ -406,16 +379,16 @@ export default function ChatPage() {
               {renderMessages()}
 
               {loading && (
-                <div className="flex items-start space-x-4">
-                  <Avatar className="w-10 h-10 mt-1">
+                <div className="flex items-start space-x-2 sm:space-x-4">
+                  <Avatar className="w-8 h-8 sm:w-10 sm:h-10 mt-1">
                     <AvatarImage src="/logo.png" alt="Medibot" />
-                    <AvatarFallback className="bg-purple-600 text-white text-sm font-semibold">
-                      <Image src="/logo.png" alt="M" width={24} height={24} className="rounded-full" />
+                    <AvatarFallback className="bg-purple-600 text-white text-xs sm:text-sm font-semibold">
+                      <Image src="/logo.png" alt="M" width={20} height={20} className="rounded-full" />
                     </AvatarFallback>
                   </Avatar>
                   <div className="flex-1">
-                    <p className="text-white font-medium mb-2">Medibot</p>
-                    <div className="bg-slate-800 rounded-2xl rounded-tl-md p-4 border border-slate-700">
+                    <p className="text-white font-medium text-xs sm:text-sm mb-1 sm:mb-2">Medibot</p>
+                    <div className="bg-slate-800 rounded-xl rounded-tl-md p-3 sm:p-4 border border-slate-700">
                       <div className="flex space-x-1">
                         <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce"></div>
                         <div
@@ -436,17 +409,16 @@ export default function ChatPage() {
             </div>
           </div>
 
-          {/* Message Input */}
-          <div className="p-4 sm:p-6 border-t border-slate-800 bg-slate-900">
-            <div className="max-w-4xl mx-auto">
-              <div className="flex items-center space-x-3 sm:space-x-4">
+          <div className="p-3 sm:p-4 md:p-6 border-t border-slate-800 bg-slate-900 sticky bottom-0">
+            <div className="max-w-full sm:max-w-3xl md:max-w-4xl mx-auto">
+              <div className="flex items-center space-x-2 sm:space-x-3">
                 <div className="flex-1 relative">
                   <Input
                     value={message}
                     onChange={(e) => setMessage(e.target.value)}
                     onKeyPress={handleKeyPress}
                     placeholder="Ask a health question..."
-                    className="bg-slate-800 border-slate-700 text-white placeholder-slate-400 h-11 sm:h-12 rounded-xl pr-12 text-sm sm:text-base"
+                    className="bg-slate-800 border-slate-700 text-white placeholder-slate-400 h-10 sm:h-11 md:h-12 rounded-xl pr-10 sm:pr-12 text-xs sm:text-sm md:text-base"
                     disabled={loading}
                     maxLength={1000}
                   />
@@ -455,7 +427,7 @@ export default function ChatPage() {
                   onClick={handleSendMessage}
                   disabled={loading || !message.trim()}
                   size="icon"
-                  className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white rounded-full h-11 w-11 sm:h-12 sm:w-12 shadow-lg disabled:opacity-50"
+                  className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white rounded-full h-10 w-10 sm:h-11 sm:w-11 md:h-12 md:w-12 shadow-lg disabled:opacity-50"
                 >
                   <Send className="h-4 w-4 sm:h-5 sm:w-5" />
                 </Button>
@@ -464,37 +436,36 @@ export default function ChatPage() {
           </div>
         </div>
 
-        {/* Prescription Analysis Dialog */}
         <Dialog open={prescriptionDialogOpen} onOpenChange={setPrescriptionDialogOpen}>
-          <DialogContent className="bg-slate-900 border-slate-800 text-white max-w-2xl mx-auto max-h-[80vh] overflow-y-auto">
+          <DialogContent className="bg-slate-900 border-slate-800 text-white max-w-[90vw] sm:max-w-2xl mx-auto max-h-[90vh] sm:max-h-[80vh] overflow-y-auto sm:rounded-lg p-4 sm:p-6">
             <DialogHeader>
-              <DialogTitle className="flex items-center space-x-2">
-                <Camera className="h-5 w-5" />
+              <DialogTitle className="flex items-center space-x-2 text-sm sm:text-base">
+                <Camera className="h-4 w-4 sm:h-5 sm:w-5" />
                 <span>Prescription Analysis</span>
               </DialogTitle>
             </DialogHeader>
 
             {!analysisResult ? (
-              <div className="space-y-4">
-                <p className="text-slate-400">
+              <div className="space-y-3 sm:space-y-4">
+                <p className="text-slate-400 text-xs sm:text-sm">
                   Upload a photo of your prescription for AI-powered analysis and information.
                 </p>
 
-                <div className="border-2 border-dashed border-slate-700 rounded-lg p-8 text-center">
+                <div className="border-2 border-dashed border-slate-700 rounded-lg p-6 sm:p-8 text-center">
                   {analyzingPrescription ? (
-                    <div className="space-y-4">
-                      <div className="w-12 h-12 border-4 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
-                      <p className="text-slate-400">Analyzing prescription...</p>
+                    <div className="space-y-3 sm:space-y-4">
+                      <div className="w-10 h-10 sm:w-12 sm:h-12 border-4 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
+                      <p className="text-slate-400 text-xs sm:text-sm">Analyzing prescription...</p>
                     </div>
                   ) : (
                     <>
-                      <Camera className="h-12 w-12 text-slate-400 mx-auto mb-4" />
-                      <p className="text-slate-400 mb-4">Upload prescription image</p>
+                      <Camera className="h-10 w-10 sm:h-12 sm:w-12 text-slate-400 mx-auto mb-3 sm:mb-4" />
+                      <p className="text-slate-400 text-xs sm:text-sm mb-3 sm:mb-4">Upload prescription image</p>
                       <Button
                         onClick={handleFileUpload}
-                        className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
+                        className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-xs sm:text-sm"
                       >
-                        <Upload className="mr-2 h-4 w-4" />
+                        <Upload className="mr-1 h-3 w-3 sm:h-4 sm:w-4" />
                         Choose File
                       </Button>
                     </>
@@ -509,22 +480,22 @@ export default function ChatPage() {
                 </p>
               </div>
             ) : (
-              <div className="space-y-6">
+              <div className="space-y-4 sm:space-y-6">
                 <Card className="bg-slate-800 border-slate-700">
                   <CardHeader>
-                    <CardTitle className="text-white flex items-center space-x-2">
-                      <FileText className="h-5 w-5" />
+                    <CardTitle className="text-white flex items-center space-x-2 text-sm sm:text-base">
+                      <FileText className="h-4 w-4 sm:h-5 sm:w-5" />
                       <span>Analysis Results</span>
                     </CardTitle>
                   </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <CardContent className="space-y-3 sm:space-y-4">
+                    <div className="grid grid-cols-1 gap-3 sm:gap-4">
                       <div>
-                        <h4 className="text-white font-medium mb-2">Detected Medications</h4>
-                        <div className="space-y-2">
+                        <h4 className="text-white font-medium text-xs sm:text-sm mb-1 sm:mb-2">Detected Medications</h4>
+                        <div className="space-y-1 sm:space-y-2 flex flex-wrap gap-1">
                           {analysisResult.medications.map((med, index) => (
-                            <Badge key={index} className="bg-purple-600 text-white mr-2 mb-2">
-                              <Pill className="mr-1 h-3 w-3" />
+                            <Badge key={index} className="bg-purple-600 text-white text-xs sm:text-sm mr-1 mb-1">
+                              <Pill className="mr-1 h-3 w-3 sm:h-3 sm:w-3" />
                               {med}
                             </Badge>
                           ))}
@@ -532,10 +503,14 @@ export default function ChatPage() {
                       </div>
 
                       <div>
-                        <h4 className="text-white font-medium mb-2">Dosage Information</h4>
-                        <div className="space-y-2">
+                        <h4 className="text-white font-medium text-xs sm:text-sm mb-1 sm:mb-2">Dosage Information</h4>
+                        <div className="space-y-1 sm:space-y-2 flex flex-wrap gap-1">
                           {analysisResult.dosages.map((dosage, index) => (
-                            <Badge key={index} variant="secondary" className="bg-slate-700 text-slate-300 mr-2 mb-2">
+                            <Badge
+                              key={index}
+                              variant="secondary"
+                              className="bg-slate-700 text-slate-300 text-xs sm:text-sm mr-1 mb-1"
+                            >
                               {dosage}
                             </Badge>
                           ))}
@@ -544,30 +519,30 @@ export default function ChatPage() {
                     </div>
 
                     <div>
-                      <h4 className="text-white font-medium mb-2">Instructions</h4>
-                      <p className="text-slate-300 text-sm bg-slate-700 p-3 rounded-lg">
+                      <h4 className="text-white font-medium text-xs sm:text-sm mb-1 sm:mb-2">Instructions</h4>
+                      <p className="text-slate-300 text-xs sm:text-sm bg-slate-700 p-2 sm:p-3 rounded-lg">
                         {analysisResult.instructions}
                       </p>
                     </div>
 
-                    {analysisResult.warnings.length > 0 && (
+                    {analysisResult.warnings?.length > 0 && (
                       <div>
-                        <h4 className="text-white font-medium mb-2 flex items-center">
-                          <AlertCircle className="mr-2 h-4 w-4 text-yellow-500" />
+                        <h4 className="text-white font-medium text-xs sm:text-sm mb-1 sm:mb-2 flex items-center">
+                          <AlertCircle className="mr-1 h-3 w-3 sm:h-4 sm:w-4 text-yellow-500" />
                           Warnings & Precautions
                         </h4>
-                        <div className="space-y-2">
+                        <div className="space-y-1 sm:space-y-2">
                           {analysisResult.warnings.map((warning, index) => (
-                            <div key={index} className="bg-yellow-900/20 border border-yellow-700 p-3 rounded-lg">
-                              <p className="text-yellow-300 text-sm">{warning}</p>
+                            <div key={index} className="bg-yellow-900/20 border border-yellow-700 p-2 sm:p-3 rounded-lg">
+                              <p className="text-yellow-300 text-xs sm:text-sm">{warning}</p>
                             </div>
                           ))}
                         </div>
                       </div>
                     )}
 
-                    <div className="bg-blue-900/20 border border-blue-700 p-4 rounded-lg">
-                      <p className="text-blue-300 text-sm">
+                    <div className="bg-blue-900/20 border border-blue-700 p-3 sm:p-4 rounded-lg">
+                      <p className="text-blue-300 text-xs sm:text-sm">
                         <strong>Important:</strong> This analysis is for informational purposes only. Always follow your
                         doctor's instructions and consult your pharmacist for any questions about your medications.
                       </p>
@@ -575,20 +550,20 @@ export default function ChatPage() {
                   </CardContent>
                 </Card>
 
-                <div className="flex space-x-3">
+                <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3">
                   <Button
                     onClick={() => {
                       setAnalysisResult(null)
                       setPrescriptionDialogOpen(false)
                     }}
                     variant="outline"
-                    className="flex-1 border-slate-700 text-slate-400 hover:text-white"
+                    className="flex-1 border-slate-700 text-slate-400 hover:text-white text-xs sm:text-sm"
                   >
                     Close
                   </Button>
                   <Button
                     onClick={() => setAnalysisResult(null)}
-                    className="flex-1 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
+                    className="flex-1 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-xs sm:text-sm"
                   >
                     Analyze Another
                   </Button>
@@ -598,32 +573,31 @@ export default function ChatPage() {
           </DialogContent>
         </Dialog>
 
-        {/* Chat History Dialog */}
         <Dialog open={historyDialogOpen} onOpenChange={setHistoryDialogOpen}>
-          <DialogContent className="bg-slate-900 border-slate-800 text-white max-w-2xl mx-auto max-h-[80vh] overflow-hidden">
+          <DialogContent className="bg-slate-900 border-slate-800 text-white max-w-[90vw] sm:max-w-2xl mx-auto max-h-[90vh] sm:max-h-[80vh] overflow-hidden sm:rounded-lg p-4 sm:p-6">
             <DialogHeader>
-              <DialogTitle className="flex items-center justify-between">
+              <DialogTitle className="flex items-center justify-between text-sm sm:text-base">
                 <div className="flex items-center space-x-2">
-                  <RotateCcw className="h-5 w-5" />
+                  <RotateCcw className="h-4 w-4 sm:h-5 sm:w-5" />
                   <span>Recent Chats</span>
                 </div>
                 <Button
                   variant="ghost"
                   size="icon"
                   onClick={() => setHistoryDialogOpen(false)}
-                  className="text-slate-400 hover:text-white"
+                  className="text-slate-400 hover:text-white h-8 w-8 sm:h-10 sm:w-10"
                 >
-                  <X className="h-4 w-4" />
+                  <X className="h-3 w-3 sm:h-4 sm:w-4" />
                 </Button>
               </DialogTitle>
             </DialogHeader>
 
-            <div className="space-y-4 overflow-y-auto max-h-96">
+            <div className="space-y-3 sm:space-y-4 overflow-y-auto max-h-80 sm:max-h-96">
               {sessions.length > 0 ? (
                 sessions.slice(0, 10).map((session) => (
                   <div
                     key={session.id}
-                    className={`p-4 rounded-lg border cursor-pointer transition-colors ${
+                    className={`p-3 sm:p-4 rounded-lg border cursor-pointer transition-colors ${
                       currentSession?.id === session.id
                         ? "bg-purple-600/20 border-purple-600"
                         : "bg-slate-800 border-slate-700 hover:bg-slate-700"
@@ -635,16 +609,16 @@ export default function ChatPage() {
                   >
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
-                        <h3 className="text-white font-medium truncate">{session.title}</h3>
-                        <p className="text-slate-400 text-sm">
-                          {session.messages.length} messages •{" "}
+                        <h3 className="text-white font-medium text-xs sm:text-sm truncate">{session.title}</h3>
+                        <p className="text-slate-400 text-xs sm:text-sm">
+                          {(session.messages ?? []).length} messages •{" "}
                           {session.updatedAt instanceof Date
                             ? session.updatedAt.toLocaleDateString()
                             : (session.updatedAt as any)?.toDate?.()?.toLocaleDateString() || "Recently"}
                         </p>
-                        {session.messages.length > 0 && (
-                          <p className="text-slate-500 text-xs mt-1 truncate">
-                            {session.messages[session.messages.length - 1]?.message}
+                        {(session.messages ?? []).length > 0 && (
+                          <p className="text-slate-500 text-xs sm:text-sm mt-1 truncate">
+                            {session.messages[session.messages.length - 1]?.message ?? "No messages"}
                           </p>
                         )}
                       </div>
@@ -652,19 +626,19 @@ export default function ChatPage() {
                   </div>
                 ))
               ) : (
-                <div className="text-center py-8">
-                  <RotateCcw className="h-12 w-12 text-slate-600 mx-auto mb-4" />
-                  <p className="text-slate-400">No chat history yet</p>
-                  <p className="text-slate-500 text-sm">Start a conversation to see your history here</p>
+                <div className="text-center py-6 sm:py-8">
+                  <RotateCcw className="h-10 w-10 sm:h-12 sm:w-12 text-slate-600 mx-auto mb-3 sm:mb-4" />
+                  <p className="text-slate-400 text-xs sm:text-sm">No chat history yet</p>
+                  <p className="text-slate-500 text-xs sm:text-sm">Start a conversation to see your history here</p>
                 </div>
               )}
             </div>
 
-            <div className="flex justify-end pt-4 border-t border-slate-800">
+            <div className="flex justify-end pt-3 sm:pt-4 border-t border-slate-800">
               <Link href="/history">
                 <Button
                   variant="outline"
-                  className="border-slate-700 text-slate-400 hover:text-white"
+                  className="border-slate-700 text-slate-400 hover:text-white text-xs sm:text-sm"
                   onClick={() => setHistoryDialogOpen(false)}
                 >
                   View Full History

@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
+import { Switch } from "@/components/ui/switch"
 import { Menu, Plus, Pill, Clock, Trash2, Edit, Bell } from "lucide-react"
 import { useAuth } from "@/hooks/useAuth"
 import {
@@ -19,23 +20,19 @@ import {
   updateMedication,
   deleteMedication,
   subscribeToUserMedications,
+  sendMedicationReminder,
   type Medication,
 } from "@/lib/firestore"
 import { toast } from "sonner"
 import { db } from "@/lib/firebase"
 import { doc, getDoc } from "firebase/firestore"
 
-// Extended Medication interface
-interface MedicationWithReminder extends Medication {
-  reminderTimes: string[]
-}
-
 export default function MedicationsPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [medications, setMedications] = useState<MedicationWithReminder[]>([])
+  const [medications, setMedications] = useState<Medication[]>([])
   const [loading, setLoading] = useState(true)
   const [dialogOpen, setDialogOpen] = useState(false)
-  const [editingMedication, setEditingMedication] = useState<MedicationWithReminder | null>(null)
+  const [editingMedication, setEditingMedication] = useState<Medication | null>(null)
   const [formData, setFormData] = useState({
     name: "",
     dosage: "",
@@ -44,11 +41,12 @@ export default function MedicationsPage() {
     endDate: "",
     notes: "",
     reminderTimes: [""],
+    enableWhatsApp: false,
+    phoneNumber: "",
   })
   const { user } = useAuth()
   const reminderTimeouts = useRef<Map<string, NodeJS.Timeout>>(new Map())
 
-  // Helper function to send mobile notifications with app icon
   const sendMobileNotification = async (userId: string, title: string, body: string) => {
     try {
       const userDocRef = doc(db, "users", userId)
@@ -58,6 +56,7 @@ export default function MedicationsPage() {
       if (!fcmToken) {
         console.log(`No FCM token found for user ${userId}. Falling back to console log.`)
         console.log(`Notification: ${title} - ${body}`)
+        toast.info("Push notifications are disabled. Enable them in your browser settings.")
         return
       }
 
@@ -80,37 +79,35 @@ export default function MedicationsPage() {
     } catch (error) {
       console.error(`Error sending mobile notification: ${error instanceof Error ? error.message : String(error)}`)
       console.log(`Fallback log: ${title} - ${body}`)
+      toast.error("Failed to send mobile notification")
     }
   }
 
-  // Helper function to send email notifications via Web3Forms
- const sendEmailNotification = async (email: string, subject: string, body: string) => {
-  try {
-    const response = await fetch("/api/send-email", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        to: email,
-        subject,
-        message: body,
-      }),
-    });
+  const sendEmailNotification = async (email: string, subject: string, body: string) => {
+    try {
+      const response = await fetch("/api/send-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          to: email,
+          subject,
+          message: body,
+        }),
+      })
 
-    const result = await response.json();
-    if (!response.ok || !result.success) {
-      throw new Error(result.message || "Failed to send email");
+      const result = await response.json()
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || "Failed to send email")
+      }
+    } catch (error) {
+      console.error("Error sending email notification:", error)
+      toast.error("Failed to send email notification")
     }
-  } catch (error) {
-    console.error("Error sending email notification:", error);
   }
-};
 
-
-  // Schedule client-side reminders using setTimeout
-  const scheduleReminders = (medication: MedicationWithReminder, email: string) => {
+  const scheduleReminders = (medication: Medication, email: string) => {
     if (!medication.id || !medication.reminderTimes.length) return
 
-    // Clear existing timeouts for this medication
     cancelReminders(medication.id)
 
     medication.reminderTimes.forEach((time, index) => {
@@ -118,7 +115,6 @@ export default function MedicationsPage() {
       const now = new Date()
       const reminder = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hours, minutes, 0)
 
-      // If reminder time is in the past, schedule for tomorrow
       if (reminder <= now) {
         reminder.setDate(reminder.getDate() + 1)
       }
@@ -127,12 +123,13 @@ export default function MedicationsPage() {
 
       const timeoutId = setTimeout(() => {
         const message = `It's time to take your ${medication.name} (${medication.dosage}) at ${time}.`
-        Promise.all([
+        const notifications = [
           sendMobileNotification(user!.uid, `Medication Reminder: ${medication.name}`, message),
           sendEmailNotification(email, `Medication Reminder: ${medication.name}`, message),
-        ])
+          sendMedicationReminder(user!.uid, medication.name, medication.enableWhatsApp ? medication.phoneNumber : undefined, medication.enableWhatsApp),
+        ]
+        Promise.all(notifications)
 
-        // Reschedule for next day
         scheduleReminders(medication, email)
       }, delay)
 
@@ -140,7 +137,6 @@ export default function MedicationsPage() {
     })
   }
 
-  // Cancel client-side reminders
   const cancelReminders = (medicationId: string) => {
     reminderTimeouts.current.forEach((timeoutId, key) => {
       if (key.startsWith(medicationId)) {
@@ -154,20 +150,18 @@ export default function MedicationsPage() {
     if (!user) return
 
     const unsubscribe = subscribeToUserMedications(user.uid, (meds) => {
-      setMedications(meds as MedicationWithReminder[])
+      setMedications(meds)
       setLoading(false)
 
-      // Schedule reminders for all medications
       meds.forEach((med) => {
         if (med.reminderTimes.length && user.email) {
-          scheduleReminders(med as MedicationWithReminder, user.email)
+          scheduleReminders(med, user.email)
         }
       })
     })
 
     return () => {
       unsubscribe()
-      // Clear all timeouts on unmount
       reminderTimeouts.current.forEach((timeoutId) => clearTimeout(timeoutId))
       reminderTimeouts.current.clear()
     }
@@ -182,6 +176,8 @@ export default function MedicationsPage() {
       endDate: "",
       notes: "",
       reminderTimes: [""],
+      enableWhatsApp: false,
+      phoneNumber: "",
     })
     setEditingMedication(null)
   }
@@ -191,7 +187,7 @@ export default function MedicationsPage() {
     setDialogOpen(true)
   }
 
-  const handleEditMedication = (medication: MedicationWithReminder) => {
+  const handleEditMedication = (medication: Medication) => {
     setFormData({
       name: medication.name,
       dosage: medication.dosage,
@@ -200,6 +196,8 @@ export default function MedicationsPage() {
       endDate: medication.endDate || "",
       notes: medication.notes || "",
       reminderTimes: medication.reminderTimes.length ? medication.reminderTimes : [""],
+      enableWhatsApp: medication.enableWhatsApp || false,
+      phoneNumber: medication.phoneNumber || "",
     })
     setEditingMedication(medication)
     setDialogOpen(true)
@@ -207,13 +205,23 @@ export default function MedicationsPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!user) return
+    if (!user) {
+      toast.error("User not authenticated")
+      return
+    }
 
     try {
-      const medicationData = {
-        ...formData,
+      const medicationData: Omit<Medication, "id" | "userId" | "createdAt" | "updatedAt"> = {
+        name: formData.name,
+        dosage: formData.dosage,
+        frequency: formData.frequency,
+        startDate: formData.startDate,
+        endDate: formData.endDate || undefined,
+        notes: formData.notes || "",
         reminderTimes: formData.reminderTimes.filter((time) => time.trim() !== ""),
         isActive: true,
+        enableWhatsApp: formData.enableWhatsApp,
+        phoneNumber: formData.enableWhatsApp ? formData.phoneNumber : undefined,
       }
 
       let medicationId: string
@@ -227,48 +235,49 @@ export default function MedicationsPage() {
         toast.success("Medication added successfully!")
       }
 
-      // Schedule reminders if applicable
-      if (medicationData.reminderTimes.length && user.email) {
-        scheduleReminders(
-          { ...medicationData, id: medicationId } as MedicationWithReminder,
-          user.email
-        )
-      }
-
-      // Send confirmation
       const message = `Your medication ${medicationData.name} (${medicationData.dosage}) has been ${editingMedication ? "updated" : "added"} successfully.`
-      await Promise.all([
+      const notifications = [
         sendMobileNotification(user.uid, "Medication Saved", message),
         user.email ? sendEmailNotification(user.email, "Medication Saved", message) : Promise.resolve(),
-      ])
+        sendMedicationReminder(user.uid, medicationData.name, medicationData.enableWhatsApp ? medicationData.phoneNumber : undefined, medicationData.enableWhatsApp),
+      ]
+      await Promise.all(notifications)
 
       setDialogOpen(false)
       resetForm()
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error)
-      await Promise.all([
+      const notifications = [
         sendMobileNotification(user.uid, "Medication Save Error", `Failed to save medication: ${errorMessage}`),
         user.email ? sendEmailNotification(user.email, "Medication Save Error", `Failed to save medication: ${errorMessage}`) : Promise.resolve(),
-      ])
-      toast.error("Failed to save medication")
+      ]
+      if (formData.enableWhatsApp && formData.phoneNumber) {
+        notifications.push(sendMedicationReminder(user.uid, formData.name, formData.phoneNumber, true))
+      }
+      await Promise.all(notifications)
+      toast.error(`Failed to save medication: ${errorMessage}`)
     }
   }
 
   const handleDeleteMedication = async (medicationId: string) => {
     try {
       await deleteMedication(medicationId)
-      // Cancel reminders
       cancelReminders(medicationId)
       toast.success("Medication deleted successfully!")
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error)
       if (user) {
-        await Promise.all([
+        const medication = medications.find((m) => m.id === medicationId)
+        const notifications = [
           sendMobileNotification(user.uid, "Medication Delete Error", `Failed to delete medication: ${errorMessage}`),
           user.email ? sendEmailNotification(user.email, "Medication Delete Error", `Failed to delete medication: ${errorMessage}`) : Promise.resolve(),
-        ])
+        ]
+        if (medication?.enableWhatsApp && medication.phoneNumber) {
+          notifications.push(sendMedicationReminder(user.uid, medication.name, medication.phoneNumber, true))
+        }
+        await Promise.all(notifications)
       }
-      toast.error("Failed to delete medication")
+      toast.error(`Failed to delete medication: ${errorMessage}`)
     }
   }
 
@@ -296,25 +305,31 @@ export default function MedicationsPage() {
     })
   }
 
-  const testReminder = async (medication: MedicationWithReminder) => {
+  const testReminder = async (medication: Medication) => {
     try {
       if (!user) {
         toast.error("User not authenticated")
         return
       }
       const message = `🧪 This is a test reminder for your medication ${medication.name} (${medication.dosage}). Your reminders are working! 💊`
-      await Promise.all([
+      const notifications = [
         sendMobileNotification(user.uid, "Test Reminder", message),
         user.email ? sendEmailNotification(user.email, "Test Reminder", message) : Promise.resolve(),
-      ])
-      toast.success("Test notifications sent successfully! 📱📧")
+        sendMedicationReminder(user.uid, medication.name, medication.enableWhatsApp ? medication.phoneNumber : undefined, medication.enableWhatsApp),
+      ]
+      await Promise.all(notifications)
+      toast.success("Test notifications sent successfully! 📱📧📲")
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error)
       if (user) {
-        await Promise.all([
+        const notifications = [
           sendMobileNotification(user.uid, "Test Reminder Error", `Failed to send test reminder for ${medication.name}: ${errorMessage}`),
           user.email ? sendEmailNotification(user.email, "Test Reminder Error", `Failed to send test reminder for ${medication.name}: ${errorMessage}`) : Promise.resolve(),
-        ])
+        ]
+        if (medication.enableWhatsApp && medication.phoneNumber) {
+          notifications.push(sendMedicationReminder(user.uid, medication.name, medication.phoneNumber, true))
+        }
+        await Promise.all(notifications)
       }
       toast.error(`Failed to send test notifications: ${errorMessage}`)
     }
@@ -326,7 +341,6 @@ export default function MedicationsPage() {
         <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
         <div className="flex-1 flex flex-col">
-          {/* Header */}
           <div className="flex items-center justify-between p-4 border-b border-slate-800 bg-slate-900">
             <div className="flex items-center space-x-3">
               <Button
@@ -372,14 +386,14 @@ export default function MedicationsPage() {
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <Label htmlFor="dosage">Dosage</Label>
-                    <Input
-                      id="dosage"
-                      value={formData.dosage}
-                      onChange={(e) => setFormData({ ...formData, dosage: e.target.value })}
-                      placeholder="e.g., 500mg"
-                      className="bg-slate-800 border-slate-700 text-white"
-                      required
-                    />
+                      <Input
+                        id="dosage"
+                        value={formData.dosage}
+                        onChange={(e) => setFormData({ ...formData, dosage: e.target.value })}
+                        placeholder="e.g., 500mg"
+                        className="bg-slate-800 border-slate-700 text-white"
+                        required
+                      />
                     </div>
                     <div>
                       <Label htmlFor="frequency">Frequency</Label>
@@ -461,6 +475,33 @@ export default function MedicationsPage() {
                   </div>
 
                   <div>
+                    <Label>WhatsApp Reminders</Label>
+                    <div className="flex items-center space-x-2 mt-2">
+                      <Switch
+                        id="enableWhatsApp"
+                        checked={formData.enableWhatsApp}
+                        onCheckedChange={(checked) =>
+                          setFormData({ ...formData, enableWhatsApp: checked, phoneNumber: checked ? formData.phoneNumber : "" })
+                        }
+                      />
+                      <Label htmlFor="enableWhatsApp">Enable WhatsApp Reminders</Label>
+                    </div>
+                    {formData.enableWhatsApp && (
+                      <div className="mt-2">
+                        <Label htmlFor="phoneNumber">Phone Number</Label>
+                        <Input
+                          id="phoneNumber"
+                          value={formData.phoneNumber}
+                          onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })}
+                          placeholder="e.g., +1234567890"
+                          className="bg-slate-800 border-slate-700 text-white"
+                          required={formData.enableWhatsApp}
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
                     <Label htmlFor="notes">Notes (Optional)</Label>
                     <Input
                       id="notes"
@@ -492,7 +533,6 @@ export default function MedicationsPage() {
             </Dialog>
           </div>
 
-          {/* Content */}
           <div className="flex-1 p-4 sm:p-6 overflow-y-auto">
             <div className="max-w-4xl mx-auto">
               <div className="mb-6 sm:mb-8">
@@ -514,6 +554,11 @@ export default function MedicationsPage() {
                           <div>
                             <CardTitle className="text-white text-lg sm:text-xl flex items-center gap-2">
                               {medication.name}
+                              {medication.enableWhatsApp && (
+                                <Badge variant="secondary" className="bg-green-600 text-white">
+                                  WhatsApp
+                                </Badge>
+                              )}
                             </CardTitle>
                             <p className="text-slate-400 text-sm sm:text-base">
                               {medication.dosage} • {medication.frequency}
@@ -562,6 +607,11 @@ export default function MedicationsPage() {
                                 Until {medication.endDate}
                               </Badge>
                             )}
+                            {medication.phoneNumber && (
+                              <Badge variant="secondary" className="bg-slate-800 text-slate-300">
+                                Phone: {medication.phoneNumber}
+                              </Badge>
+                            )}
                           </div>
 
                           {medication.reminderTimes.length > 0 && (
@@ -590,12 +640,10 @@ export default function MedicationsPage() {
                   <div className="w-16 h-16 sm:w-20 sm:h-20 bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-6 sm:mb-8">
                     <Pill className="h-8 w-8 sm:h-10 sm:w-10 text-slate-400" />
                   </div>
-
                   <h3 className="text-xl sm:text-2xl font-semibold text-white mb-3 sm:mb-4">No medications added</h3>
                   <p className="text-slate-400 mb-6 sm:mb-8 max-w-md mx-auto text-sm sm:text-lg">
                     Add your medications to track doses and set reminders
                   </p>
-
                   <Button
                     onClick={handleAddMedication}
                     className="bg-white text-slate-900 hover:bg-slate-100 rounded-xl h-12 px-6 sm:px-8 font-semibold"

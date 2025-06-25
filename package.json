@@ -1,5 +1,5 @@
 {
-  "name": "my-v0-project",
+  "name": "Medibott",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -51,11 +51,13 @@
     "input-otp": "1.4.1",
     "lucide-react": "^0.454.0",
     "next": "15.2.4",
+    "next-pwa": "^5.6.0",
     "next-themes": "latest",
     "react": "^19",
     "react-day-picker": "8.10.1",
     "react-dom": "^19",
     "react-hook-form": "^7.54.1",
+    "react-hot-toast": "^2.5.2",
     "react-resizable-panels": "^2.1.7",
     "recharts": "2.15.0",
     "resend": "^4.6.0",
@@ -67,6 +69,7 @@
     "zod": "^3.24.1"
   },
   "devDependencies": {
+    "@types/googlemaps": "^3.43.3",
     "@types/node": "^22",
     "@types/react": "^19",
     "@types/react-dom": "^19",

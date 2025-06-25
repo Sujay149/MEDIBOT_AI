@@ -12,7 +12,6 @@ import { MapPin, Search } from "lucide-react"
 import { useAuth } from "@/hooks/useAuth"
 import { addAppointment, updateAppointment, type Appointment } from "@/lib/firestore"
 import { toast } from "sonner"
-import type { google } from "googlemaps"
 
 interface AppointmentFormProps {
   appointment?: Appointment | null
@@ -230,10 +229,10 @@ export function AppointmentForm({ appointment, onSuccess, onCancel }: Appointmen
       console.log("User ID:", user.uid)
 
       if (appointment && appointment.id) {
-        await updateAppointment(appointment.id, appointmentData)
+        await updateAppointment(appointment.id, { ...appointmentData, hospitalLocation: hospitalLocation ?? undefined })
         toast.success("Appointment updated successfully!")
       } else {
-        await addAppointment(user.uid, appointmentData)
+        await addAppointment(user.uid, { ...appointmentData, hospitalLocation: hospitalLocation ?? undefined })
         toast.success("Appointment booked successfully!")
       }
 

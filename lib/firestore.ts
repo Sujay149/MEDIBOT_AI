@@ -75,7 +75,7 @@ export interface Medication {
   notes?: string
   reminderTimes: string[]
   isActive: boolean
-  smsEnabled?: boolean
+  enableWhatsApp?: boolean // Renamed from smsEnabled for clarity
   phoneNumber?: string
   createdAt: Timestamp | Date
   updatedAt: Timestamp | Date
@@ -363,6 +363,8 @@ export const addMedication = async (
       userId,
       ...medication,
       isActive: true,
+      enableWhatsApp: medication.enableWhatsApp || false,
+      phoneNumber: medication.enableWhatsApp ? medication.phoneNumber : undefined,
       createdAt: serverTimestamp() as Timestamp,
       updatedAt: serverTimestamp() as Timestamp,
     }
@@ -370,7 +372,9 @@ export const addMedication = async (
     const docRef = await addDoc(medicationRef, medicationData)
 
     // Schedule medication reminders
-    await scheduleMedicationReminders(userId, docRef.id, medication.reminderTimes)
+    if (medication.reminderTimes.length) {
+      await scheduleMedicationReminders(userId, docRef.id, medication.reminderTimes, medication.enableWhatsApp, medication.phoneNumber)
+    }
 
     return docRef.id
   } catch (error) {
@@ -379,23 +383,30 @@ export const addMedication = async (
   }
 }
 
-export const updateMedication = async (medicationId: string, data: Partial<Medication>) => {
-  try {
-    const medicationRef = doc(db, "medications", medicationId)
-    await updateDoc(medicationRef, {
-      ...data,
-      updatedAt: serverTimestamp(),
-    })
-  } catch (error) {
-    console.error("Error updating medication:", error)
-    throw new Error("Failed to update medication")
+export async function updateMedication(medicationId: string, data: Partial<Medication>) {
+  const docRef = doc(db, "medications", medicationId);
+  const updateData: Record<string, any> = {};
+  for (const [key, value] of Object.entries(data)) {
+    if (value !== undefined) {
+      updateData[key] = value === null ? null : value;
+    }
   }
+  updateData.updatedAt = new Date().toISOString();
+  await updateDoc(docRef, updateData);
 }
 
 export const deleteMedication = async (medicationId: string) => {
   try {
     const medicationRef = doc(db, "medications", medicationId)
     await deleteDoc(medicationRef)
+
+    // Delete associated reminders
+    const remindersRef = collection(db, "medicationReminders")
+    const q = query(remindersRef, where("medicationId", "==", medicationId))
+    const querySnapshot = await getDocs(q)
+    for (const doc of querySnapshot.docs) {
+      await deleteDoc(doc.ref)
+    }
   } catch (error) {
     console.error("Error deleting medication:", error)
     throw new Error("Failed to delete medication")
@@ -429,22 +440,148 @@ export const getUserMedications = async (userId: string): Promise<Medication[]> 
   }
 }
 
+export const subscribeToUserMedications = (userId: string, callback: (medications: Medication[]) => void) => {
+  const medicationsRef = collection(db, "medications")
+  const q = query(medicationsRef, where("userId", "==", userId), limit(50))
+
+  return onSnapshot(
+    q,
+    (querySnapshot) => {
+      try {
+        const medications = querySnapshot.docs
+          .map(
+            (doc) =>
+              ({
+                id: doc.id,
+                ...doc.data(),
+              }) as Medication,
+          )
+          .filter((med) => med.isActive)
+
+        const sortedMedications = medications.sort((a, b) => {
+          const aTime = a.createdAt instanceof Date ? a.createdAt.getTime() : (a.createdAt as any)?.seconds * 1000 || 0
+          const bTime = b.createdAt instanceof Date ? b.createdAt.getTime() : (b.createdAt as any)?.seconds * 1000 || 0
+          return bTime - aTime
+        })
+
+        callback(sortedMedications)
+      } catch (error) {
+        console.error("Error processing medications:", error)
+        callback([])
+      }
+    },
+    (error) => {
+      console.error("Error in medications listener:", error)
+      callback([])
+    },
+  )
+}
+
+// Notification Functions
+export const createNotificationSettings = async (userId: string) => {
+  try {
+    const notificationRef = collection(db, "notificationSettings")
+    const notificationData: Omit<NotificationSettings, "id"> = {
+      userId,
+      emailNotifications: true,
+      pushNotifications: true,
+      medicationReminders: true,
+      appointmentReminders: true,
+      reminderTimes: ["09:00", "21:00"],
+      createdAt: serverTimestamp() as Timestamp,
+    }
+
+    const docRef = await addDoc(notificationRef, notificationData)
+    return docRef.id
+  } catch (error) {
+    console.error("Error creating notification settings:", error)
+    throw new Error("Failed to create notification settings")
+  }
+}
+
+export const scheduleMedicationReminders = async (
+  userId: string,
+  medicationId: string,
+  reminderTimes: string[],
+  enableWhatsApp?: boolean,
+  phoneNumber?: string
+) => {
+  try {
+    // Store reminder schedule
+    const reminderRef = collection(db, "medicationReminders")
+    const reminderData = {
+      userId,
+      medicationId,
+      reminderTimes,
+      enableWhatsApp: enableWhatsApp || false,
+      phoneNumber: enableWhatsApp ? phoneNumber : null,
+      isActive: true,
+      createdAt: serverTimestamp(),
+    }
+
+    await addDoc(reminderRef, reminderData)
+
+    // Request notification permission if not already granted
+    if ("Notification" in window && Notification.permission === "default") {
+      await Notification.requestPermission()
+    }
+
+    // Schedule WhatsApp reminders if enabled
+    if (enableWhatsApp && phoneNumber) {
+      for (const time of reminderTimes) {
+        // In a real implementation, this would schedule a server-side task (e.g., using Cloud Functions)
+        // For client-side demo, we'll log the intent
+        console.log(`Scheduling WhatsApp reminder for ${phoneNumber} at ${time}`)
+      }
+    }
+  } catch (error) {
+    console.error("Error scheduling medication reminders:", error)
+    throw new Error("Failed to schedule reminders")
+  }
+}
+
+export const sendMedicationReminder = async (userId: string, medicationName: string, phoneNumber?: string, enableWhatsApp?: boolean) => {
+  try {
+    // Browser notification
+    if ("Notification" in window && Notification.permission === "granted") {
+      new Notification("Medication Reminder", {
+        body: `Time to take your ${medicationName}`,
+        icon: "/logo.png",
+        badge: "/logo.png",
+        tag: "medication-reminder",
+      })
+    }
+
+    // Send WhatsApp notification if enabled
+    if (enableWhatsApp && phoneNumber) {
+      const message = `Time to take your ${medicationName}`
+      await fetch("/api/send-whatsapp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          to: phoneNumber,
+          message,
+        }),
+      })
+    }
+  } catch (error) {
+    console.error("Error sending medication reminder:", error)
+  }
+}
+
 // Appointment Functions
 export const addAppointment = async (
   userId: string,
   appointment: Omit<Appointment, "id" | "userId" | "status" | "createdAt" | "updatedAt">,
 ) => {
   try {
-    console.log("Adding appointment for user:", userId)
-    console.log("Appointment data:", appointment)
-
     const appointmentRef = collection(db, "appointments")
     const appointmentData: Omit<Appointment, "id"> = {
       userId,
       hospitalName: appointment.hospitalName,
       hospitalAddress: appointment.hospitalAddress,
       hospitalPhone: appointment.hospitalPhone || "",
-      hospitalLocation: appointment.hospitalLocation || null,
+      hospitalLocation: appointment.hospitalLocation || undefined,
       doctorName: appointment.doctorName,
       appointmentType: appointment.appointmentType,
       date: appointment.date,
@@ -455,15 +592,11 @@ export const addAppointment = async (
       updatedAt: serverTimestamp() as Timestamp,
     }
 
-    console.log("Final appointment data to save:", appointmentData)
-
     const docRef = await addDoc(appointmentRef, appointmentData)
-    console.log("Appointment saved with ID:", docRef.id)
-
     return docRef.id
   } catch (error) {
-    console.error("Detailed error adding appointment:", error)
-    throw new Error(`Failed to add appointment: ${error.message}`)
+    console.error("Error adding appointment:", error)
+    throw new Error(`Failed to add appointment: ${error instanceof Error ? error.message : String(error)}`)
   }
 }
 
@@ -491,8 +624,6 @@ export const deleteAppointment = async (appointmentId: string) => {
 }
 
 export const subscribeToUserAppointments = (userId: string, callback: (appointments: Appointment[]) => void) => {
-  console.log("Setting up appointments listener for user:", userId)
-
   const appointmentsRef = collection(db, "appointments")
   const q = query(appointmentsRef, where("userId", "==", userId), limit(50))
 
@@ -500,16 +631,13 @@ export const subscribeToUserAppointments = (userId: string, callback: (appointme
     q,
     (querySnapshot) => {
       try {
-        console.log("Appointments snapshot received, docs count:", querySnapshot.docs.length)
-
-        const appointments = querySnapshot.docs.map((doc) => {
-          const data = doc.data()
-          console.log("Appointment doc data:", data)
-          return {
-            id: doc.id,
-            ...data,
-          } as Appointment
-        })
+        const appointments = querySnapshot.docs.map(
+          (doc) =>
+            ({
+              id: doc.id,
+              ...doc.data(),
+            }) as Appointment,
+        )
 
         const sortedAppointments = appointments.sort((a, b) => {
           const aTime = new Date(`${a.date}T${a.time}`).getTime()
@@ -517,7 +645,6 @@ export const subscribeToUserAppointments = (userId: string, callback: (appointme
           return bTime - aTime
         })
 
-        console.log("Sorted appointments:", sortedAppointments)
         callback(sortedAppointments)
       } catch (error) {
         console.error("Error processing appointments:", error)
@@ -553,72 +680,6 @@ export const getUserAppointments = async (userId: string): Promise<Appointment[]
   } catch (error) {
     console.error("Error getting appointments:", error)
     return []
-  }
-}
-
-// Notification Functions
-export const createNotificationSettings = async (userId: string) => {
-  try {
-    const notificationRef = collection(db, "notificationSettings")
-    const notificationData: Omit<NotificationSettings, "id"> = {
-      userId,
-      emailNotifications: true,
-      pushNotifications: true,
-      medicationReminders: true,
-      appointmentReminders: true,
-      reminderTimes: ["09:00", "21:00"],
-      createdAt: serverTimestamp() as Timestamp,
-    }
-
-    const docRef = await addDoc(notificationRef, notificationData)
-    return docRef.id
-  } catch (error) {
-    console.error("Error creating notification settings:", error)
-    throw new Error("Failed to create notification settings")
-  }
-}
-
-export const scheduleMedicationReminders = async (userId: string, medicationId: string, reminderTimes: string[]) => {
-  try {
-    // In a real implementation, this would integrate with a notification service
-    // For now, we'll just store the reminder schedule
-    const reminderRef = collection(db, "medicationReminders")
-    const reminderData = {
-      userId,
-      medicationId,
-      reminderTimes,
-      isActive: true,
-      createdAt: serverTimestamp(),
-    }
-
-    await addDoc(reminderRef, reminderData)
-
-    // Request notification permission if not already granted
-    if ("Notification" in window && Notification.permission === "default") {
-      await Notification.requestPermission()
-    }
-  } catch (error) {
-    console.error("Error scheduling medication reminders:", error)
-    throw new Error("Failed to schedule reminders")
-  }
-}
-
-export const sendMedicationReminder = async (userId: string, medicationName: string) => {
-  try {
-    // Browser notification
-    if ("Notification" in window && Notification.permission === "granted") {
-      new Notification("Medication Reminder", {
-        body: `Time to take your ${medicationName}`,
-        icon: "/logo.png",
-        badge: "/logo.png",
-        tag: "medication-reminder",
-      })
-    }
-
-    // You could also send email notifications here
-    // await sendEmailReminder(userId, medicationName)
-  } catch (error) {
-    console.error("Error sending medication reminder:", error)
   }
 }
 
@@ -746,43 +807,6 @@ export const subscribeToUserChatSessions = (userId: string, callback: (sessions:
     },
     (error) => {
       console.error("Error in chat sessions listener:", error)
-      callback([])
-    },
-  )
-}
-
-export const subscribeToUserMedications = (userId: string, callback: (medications: Medication[]) => void) => {
-  const medicationsRef = collection(db, "medications")
-  const q = query(medicationsRef, where("userId", "==", userId), limit(50))
-
-  return onSnapshot(
-    q,
-    (querySnapshot) => {
-      try {
-        const medications = querySnapshot.docs
-          .map(
-            (doc) =>
-              ({
-                id: doc.id,
-                ...doc.data(),
-              }) as Medication,
-          )
-          .filter((med) => med.isActive)
-
-        const sortedMedications = medications.sort((a, b) => {
-          const aTime = a.createdAt instanceof Date ? a.createdAt.getTime() : (a.createdAt as any)?.seconds * 1000 || 0
-          const bTime = b.createdAt instanceof Date ? b.createdAt.getTime() : (b.createdAt as any)?.seconds * 1000 || 0
-          return bTime - aTime
-        })
-
-        callback(sortedMedications)
-      } catch (error) {
-        console.error("Error processing medications:", error)
-        callback([])
-      }
-    },
-    (error) => {
-      console.error("Error in medications listener:", error)
       callback([])
     },
   )

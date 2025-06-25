@@ -70,16 +70,26 @@ export default function DashboardPage() {
     }
   }, [user])
 
-  const totalMessages = chatSessions.reduce((total, session) => total + session.messages.length, 0)
+  const totalMessages = chatSessions.reduce((total, session) => {
+    return total + (session.messages && Array.isArray(session.messages) ? session.messages.length : 0)
+  }, 0)
+
   const activeMedications = medications.filter((med) => med.isActive).length
+
   const recentActivity = chatSessions
     .flatMap((session) =>
-      session.messages.map((msg) => ({
-        ...msg,
-        sessionTitle: session.title,
-      })),
+      session.messages && Array.isArray(session.messages)
+        ? session.messages.map((msg) => ({
+            ...msg,
+            sessionTitle: session.title,
+          }))
+        : [],
     )
-    .sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0))
+    .sort((a, b) => {
+      const getSeconds = (t: Date | { seconds: number }) =>
+        t instanceof Date ? t.getTime() / 1000 : t.seconds
+      return getSeconds(b.timestamp) - getSeconds(a.timestamp)
+    })
     .slice(0, 5)
 
   // Calculate health score based on user activity
@@ -226,14 +236,16 @@ export default function DashboardPage() {
                         Search Medical Info
                       </Button>
                     </Link>
-                    <Button
-                      onClick={handleCreateSampleData}
-                      variant="outline"
-                      className="w-full bg-slate-800 border-slate-700 text-white hover:bg-slate-700 h-12"
-                    >
-                      <Plus className="mr-2 h-4 w-4" />
-                      Add Health Record
-                    </Button>
+                    <Link href="/appointments">
+                      <Button
+                        onClick={handleCreateSampleData}
+                        variant="outline"
+                        className="w-full bg-slate-800 border-slate-700 text-white hover:bg-slate-700 h-12"
+                      >
+                        <Plus className="mr-2 h-4 w-4" />
+                        Appointments Record
+                      </Button>
+                    </Link>
                   </div>
                 </CardContent>
               </Card>
@@ -258,7 +270,10 @@ export default function DashboardPage() {
                             <span className="text-slate-300 text-sm block truncate">{activity.message}</span>
                             <span className="text-slate-500 text-xs">
                               in {activity.sessionTitle} •{" "}
-                              {activity.timestamp?.toDate?.()?.toLocaleDateString() || "Recently"}
+                              {(activity.timestamp instanceof Date
+                                ? activity.timestamp
+                                : activity.timestamp?.toDate()
+                              )?.toLocaleDateString() || "Recently"}
                             </span>
                           </div>
                         </div>
