@@ -182,11 +182,23 @@ export default function SignUpPage() {
 
             <div className="flex items-start space-x-2 py-2">
               <Checkbox
-                id="terms"
-                checked={formData.agreeToTerms}
-                onCheckedChange={(checked) => setFormData({ ...formData, agreeToTerms: checked as boolean })}
-                className="mt-1"
-              />
+  id="terms"
+  checked={formData.agreeToTerms}
+  onCheckedChange={(checked) => setFormData({ ...formData, agreeToTerms: checked as boolean })}
+  className="
+    mt-1
+    border-2
+    border-purple-500
+    rounded
+    text-white
+    data-[state=checked]:bg-purple-600
+    data-[state=checked]:border-purple-700
+    data-[state=unchecked]:border-purple-500
+    focus-visible:ring-2
+    focus-visible:ring-purple-500
+  "
+/>
+
               <label htmlFor="terms" className="text-xs sm:text-sm text-slate-300 leading-relaxed">
                 I agree to the{" "}
                 <Link href="#" className="text-purple-400 hover:underline">
