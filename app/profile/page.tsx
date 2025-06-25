@@ -1,25 +1,53 @@
-"use client"
+"use client";
 
-import type React from "react"
+import type React from "react";
+import { useState, useEffect, useRef } from "react";
+import { Sidebar } from "@/components/sidebar";
+import { AuthGuard } from "@/components/auth-guard";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Switch } from "@/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Menu, User, Palette, Bell, Shield, Database, Camera } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
+import { updateUserProfile, uploadProfilePicture, type UserProfile as FirestoreUserProfile } from "@/lib/firestore";
 
-import { useState, useEffect, useRef } from "react"
-import { Sidebar } from "@/components/sidebar"
-import { AuthGuard } from "@/components/auth-guard"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Switch } from "@/components/ui/switch"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Menu, User, Palette, Bell, Shield, Database, Camera } from "lucide-react"
-import { useAuth } from "@/hooks/useAuth"
-import { updateUserProfile, uploadProfilePicture, type UserProfile } from "@/lib/firestore"
-import { toast } from "sonner"
+// Extend the UserProfile type locally to include all preference fields used in this file
+type ExtendedPreferences = {
+  theme: "dark" | "light";
+  notifications: boolean;
+  emailNotifications: boolean;
+  medicationReminders: boolean;
+  appointmentReminders: boolean;
+  healthTips: boolean;
+  pushNotifications: boolean;
+  shareDataForResearch: boolean;
+  analytics: boolean;
+  saveConversations: boolean;
+};
+
+type ExtendedUserProfile = Omit<FirestoreUserProfile, "preferences"> & {
+  preferences: ExtendedPreferences;
+};
+import { toast } from "sonner";
+// import { debounce } from "lodash"; // Uncomment for autosave feature
+
+// Validation regex patterns
+const PHONE_REGEX = /^\+?[1-9]\d{1,14}$/;
+const NAME_REGEX = /^[a-zA-Z\s-]{2,50}$/;
+const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2MB
 
 export default function ProfilePage() {
-  const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [loading, setLoading] = useState(false)
-  const [uploadingPhoto, setUploadingPhoto] = useState(false)
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const { user, userProfile } = useAuth() as { user: any, userProfile: ExtendedUserProfile | null };
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const [formData, setFormData] = useState({
     displayName: "",
     email: "",
@@ -44,10 +72,9 @@ export default function ProfilePage() {
       analytics: true,
       saveConversations: true,
     },
-  })
-  const { user, userProfile } = useAuth()
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  });
 
+  // Initialize form with user profile data
   useEffect(() => {
     if (userProfile) {
       setFormData({
@@ -68,23 +95,140 @@ export default function ProfilePage() {
           emailNotifications: userProfile.preferences?.emailNotifications ?? true,
           medicationReminders: userProfile.preferences?.medicationReminders ?? true,
           appointmentReminders: userProfile.preferences?.appointmentReminders ?? true,
-          healthTips: false,
-          pushNotifications: true,
-          shareDataForResearch: false,
-          analytics: true,
-          saveConversations: true,
+          healthTips: userProfile.preferences?.healthTips ?? false,
+          pushNotifications: userProfile.preferences?.pushNotifications ?? true,
+          shareDataForResearch: userProfile.preferences?.shareDataForResearch ?? false,
+          analytics: userProfile.preferences?.analytics ?? true,
+          saveConversations: userProfile.preferences?.saveConversations ?? true,
         },
-      })
+      });
     }
-  }, [userProfile])
+  }, [userProfile]);
 
+  // Warn about unsaved changes when leaving the page
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasUnsavedChanges) {
+        e.preventDefault();
+        e.returnValue = "You have unsaved changes. Are you sure you want to leave?";
+      }
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [hasUnsavedChanges]);
+
+  // Optional: Load form data from localStorage on mount
+  /*
+  useEffect(() => {
+    const savedFormData = localStorage.getItem("profileFormData");
+    if (savedFormData) {
+      setFormData(JSON.parse(savedFormData));
+    }
+  }, []);
+  */
+
+  // Optional: Save form data to localStorage on change
+  /*
+  useEffect(() => {
+    localStorage.setItem("profileFormData", JSON.stringify(formData));
+  }, [formData]);
+  */
+
+  // Optional: Debounced autosave to Firestore
+  /*
+  const debouncedUpdateProfile = debounce(async (data: Partial<UserProfile>) => {
+    if (user) {
+      try {
+        await updateUserProfile(user.uid, data);
+        setHasUnsavedChanges(false);
+        toast.success("Profile autosaved!");
+      } catch (error) {
+        console.error("Autosave error:", error);
+        toast.error("Failed to autosave profile");
+      }
+    }
+  }, 1000);
+
+  useEffect(() => {
+    if (hasUnsavedChanges) {
+      debouncedUpdateProfile({
+        displayName: formData.displayName,
+        dateOfBirth: formData.dateOfBirth,
+        gender: formData.gender,
+        phoneNumber: formData.phoneNumber,
+        emergencyContact: {
+          name: formData.emergencyContactName,
+          phone: formData.emergencyContactPhone,
+          relationship: formData.emergencyContactRelationship,
+        },
+        medicalInfo: {
+          allergies: formData.allergies.split(",").map((a) => a.trim()).filter((a) => a),
+          conditions: formData.conditions.split(",").map((c) => c.trim()).filter((c) => c),
+          bloodType: formData.bloodType,
+        },
+        preferences: formData.preferences,
+      });
+    }
+  }, [formData]);
+  */
+
+  // Validate form fields
+  const validateForm = (): boolean => {
+    const newErrors: Record<string, string> = {};
+
+    if (!formData.displayName.match(NAME_REGEX)) {
+      newErrors.displayName = "Display name must be 2-50 characters, letters only";
+    }
+
+    if (formData.phoneNumber && !formData.phoneNumber.match(PHONE_REGEX)) {
+      newErrors.phoneNumber = "Invalid phone number format (e.g., +1234567890)";
+    }
+
+    if (formData.emergencyContactPhone && !formData.emergencyContactPhone.match(PHONE_REGEX)) {
+      newErrors.emergencyContactPhone = "Invalid emergency contact phone format";
+    }
+
+    if (formData.emergencyContactName && !formData.emergencyContactName.match(NAME_REGEX)) {
+      newErrors.emergencyContactName = "Contact name must be 2-50 characters, letters only";
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  // Handle form input changes
+  const handleInputChange = (field: string, value: string | boolean) => {
+    setFormData((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+    setHasUnsavedChanges(true);
+  };
+
+  // Handle preference changes
+  const handlePreferenceChange = (key: string, value: boolean | string) => {
+    setFormData((prev) => ({
+      ...prev,
+      preferences: {
+        ...prev.preferences,
+        [key]: value,
+      },
+    }));
+    setHasUnsavedChanges(true);
+  };
+
+  // Update profile in Firestore
   const handleUpdateProfile = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!user) return
+    e.preventDefault();
+    if (!user || !validateForm()) {
+      toast.error("Please fix form errors before submitting");
+      return;
+    }
 
-    setLoading(true)
+    setLoading(true);
     try {
-      const updateData: Partial<UserProfile> = {
+      const updateData: Partial<ExtendedUserProfile> = {
         displayName: formData.displayName,
         dateOfBirth: formData.dateOfBirth,
         gender: formData.gender,
@@ -106,69 +250,69 @@ export default function ProfilePage() {
           bloodType: formData.bloodType,
         },
         preferences: formData.preferences,
-      }
+      };
 
-      await updateUserProfile(user.uid, updateData)
-      toast.success("Profile updated successfully!")
+      await updateUserProfile(user.uid, updateData);
+      setHasUnsavedChanges(false);
+      // localStorage.removeItem("profileFormData"); // Uncomment if using localStorage
+      toast.success("Profile updated successfully!");
     } catch (error) {
-      console.error("Error updating profile:", error)
-      toast.error("Failed to update profile")
+      console.error("Error updating profile:", error);
+      toast.error("Failed to update profile");
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
+  // Handle profile picture upload
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file || !user) return
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
 
-    setUploadingPhoto(true)
-    try {
-      await uploadProfilePicture(user.uid, file)
-      toast.success("Profile picture updated successfully!")
-    } catch (error) {
-      console.error("Error uploading photo:", error)
-      toast.error("Failed to upload profile picture")
-    } finally {
-      setUploadingPhoto(false)
+    if (file.size > MAX_FILE_SIZE) {
+      toast.error("File size must be less than 2MB");
+      return;
     }
-  }
 
-  const handlePreferenceChange = (key: string, value: boolean | string) => {
-    setFormData({
-      ...formData,
-      preferences: {
-        ...formData.preferences,
-        [key]: value,
-      },
-    })
-  }
+    setUploadingPhoto(true);
+    try {
+      await uploadProfilePicture(user.uid, file);
+      toast.success("Profile picture updated successfully!");
+    } catch (error) {
+      console.error("Error uploading photo:", error);
+      toast.error("Failed to upload profile picture");
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
 
+  // Export user data
   const handleExportData = () => {
     const exportData = {
       profile: userProfile,
       exportDate: new Date().toISOString(),
       note: "This is your Medibot data export",
-    }
+      };
 
-    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement("a")
-    a.href = url
-    a.download = `Medibot-data-export-${new Date().toISOString().split("T")[0]}.json`
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `Medibot-data-export-${new Date().toISOString().split("T")[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
 
-    toast.success("Data exported successfully!")
-  }
+    toast.success("Data exported successfully!");
+  };
 
+  // Clear user data (placeholder)
   const handleClearData = () => {
     if (window.confirm("Are you sure you want to clear all your data? This action cannot be undone.")) {
-      toast.success("Data clearing initiated. This feature will be implemented soon.")
+      toast.success("Data clearing initiated. This feature will be implemented soon.");
     }
-  }
+  };
 
   return (
     <AuthGuard>
@@ -184,6 +328,7 @@ export default function ProfilePage() {
                 size="icon"
                 onClick={() => setSidebarOpen(true)}
                 className="text-slate-400 hover:text-white lg:hidden"
+                aria-label="Open sidebar"
               >
                 <Menu className="h-5 w-5" />
               </Button>
@@ -220,6 +365,7 @@ export default function ProfilePage() {
                           className="bg-slate-800 border-slate-700 text-white hover:bg-slate-700"
                           onClick={() => fileInputRef.current?.click()}
                           disabled={uploadingPhoto}
+                          aria-label="Change profile picture"
                         >
                           {uploadingPhoto ? (
                             <>
@@ -239,51 +385,78 @@ export default function ProfilePage() {
                           accept="image/*"
                           onChange={handlePhotoUpload}
                           className="hidden"
+                          aria-hidden="true"
                         />
-                        <p className="text-slate-400 text-sm mt-2">JPG, PNG or GIF. Max size 2MB.</p>
+                        <p className="text-slate-400 text-sm mt-2">JPG, PNG, or GIF. Max size 2MB.</p>
                       </div>
                     </div>
 
                     {/* Basic Information */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-slate-300 text-sm font-medium mb-2">Display Name</label>
+                        <label htmlFor="displayName" className="block text-slate-300 text-sm font-medium mb-2">
+                          Display Name
+                        </label>
                         <Input
+                          id="displayName"
                           value={formData.displayName}
-                          onChange={(e) => setFormData({ ...formData, displayName: e.target.value })}
+                          onChange={(e) => handleInputChange("displayName", e.target.value)}
                           className="bg-slate-800 border-slate-700 text-white"
                           placeholder="Enter your display name"
+                          aria-describedby="displayName-error"
+                          required
                         />
+                        {errors.displayName && (
+                          <p id="displayName-error" className="text-red-500 text-xs mt-1">
+                            {errors.displayName}
+                          </p>
+                        )}
                       </div>
                       <div>
-                        <label className="block text-slate-300 text-sm font-medium mb-2">Email Address</label>
+                        <label htmlFor="email" className="block text-slate-300 text-sm font-medium mb-2">
+                          Email Address
+                        </label>
                         <Input
+                          id="email"
                           value={formData.email}
                           disabled
                           className="bg-slate-800 border-slate-700 text-slate-400"
+                          aria-describedby="email-note"
                         />
-                        <p className="text-slate-500 text-xs mt-1">Email cannot be changed</p>
+                        <p id="email-note" className="text-slate-500 text-xs mt-1">
+                          Email cannot be changed
+                        </p>
                       </div>
                     </div>
 
                     {/* Personal Information */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div>
-                        <label className="block text-slate-300 text-sm font-medium mb-2">Date of Birth</label>
+                        <label htmlFor="dateOfBirth" className="block text-slate-300 text-sm font-medium mb-2">
+                          Date of Birth
+                        </label>
                         <Input
+                          id="dateOfBirth"
                           type="date"
                           value={formData.dateOfBirth}
-                          onChange={(e) => setFormData({ ...formData, dateOfBirth: e.target.value })}
+                          onChange={(e) => handleInputChange("dateOfBirth", e.target.value)}
                           className="bg-slate-800 border-slate-700 text-white"
+                          max={new Date().toISOString().split("T")[0]}
                         />
                       </div>
                       <div>
-                        <label className="block text-slate-300 text-sm font-medium mb-2">Gender</label>
+                        <label htmlFor="gender" className="block text-slate-300 text-sm font-medium mb-2">
+                          Gender
+                        </label>
                         <Select
                           value={formData.gender}
-                          onValueChange={(value) => setFormData({ ...formData, gender: value })}
+                          onValueChange={(value) => handleInputChange("gender", value)}
                         >
-                          <SelectTrigger className="bg-slate-800 border-slate-700 text-white">
+                          <SelectTrigger
+                            id="gender"
+                            className="bg-slate-800 border-slate-700 text-white"
+                            aria-label="Select gender"
+                          >
                             <SelectValue placeholder="Select gender" />
                           </SelectTrigger>
                           <SelectContent className="bg-slate-900 border-2 border-purple-600 text-white shadow-lg">
@@ -295,14 +468,23 @@ export default function ProfilePage() {
                         </Select>
                       </div>
                       <div>
-                        <label className="block text-slate-300 text-sm font-medium mb-2">Phone Number</label>
+                        <label htmlFor="phoneNumber" className="block text-slate-300 text-sm font-medium mb-2">
+                          Phone Number
+                        </label>
                         <Input
+                          id="phoneNumber"
                           type="tel"
                           value={formData.phoneNumber}
-                          onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })}
+                          onChange={(e) => handleInputChange("phoneNumber", e.target.value)}
                           className="bg-slate-800 border-slate-700 text-white"
-                          placeholder="Your phone number"
+                          placeholder="+1234567890"
+                          aria-describedby="phoneNumber-error"
                         />
+                        {errors.phoneNumber && (
+                          <p id="phoneNumber-error" className="text-red-500 text-xs mt-1">
+                            {errors.phoneNumber}
+                          </p>
+                        )}
                       </div>
                     </div>
 
@@ -311,29 +493,53 @@ export default function ProfilePage() {
                       <h3 className="text-white font-medium text-lg">Emergency Contact</h3>
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div>
-                          <label className="block text-slate-300 text-sm font-medium mb-2">Contact Name</label>
+                          <label htmlFor="emergencyContactName" className="block text-slate-300 text-sm font-medium mb-2">
+                            Contact Name
+                          </label>
                           <Input
+                            id="emergencyContactName"
                             value={formData.emergencyContactName}
-                            onChange={(e) => setFormData({ ...formData, emergencyContactName: e.target.value })}
+                            onChange={(e) => handleInputChange("emergencyContactName", e.target.value)}
                             className="bg-slate-800 border-slate-700 text-white"
                             placeholder="Emergency contact name"
+                            aria-describedby="emergencyContactName-error"
                           />
+                          {errors.emergencyContactName && (
+                            <p id="emergencyContactName-error" className="text-red-500 text-xs mt-1">
+                              {errors.emergencyContactName}
+                            </p>
+                          )}
                         </div>
                         <div>
-                          <label className="block text-slate-300 text-sm font-medium mb-2">Contact Phone</label>
+                          <label htmlFor="emergencyContactPhone" className="block text-slate-300 text-sm font-medium mb-2">
+                            Contact Phone
+                          </label>
                           <Input
+                            id="emergencyContactPhone"
                             type="tel"
                             value={formData.emergencyContactPhone}
-                            onChange={(e) => setFormData({ ...formData, emergencyContactPhone: e.target.value })}
+                            onChange={(e) => handleInputChange("emergencyContactPhone", e.target.value)}
                             className="bg-slate-800 border-slate-700 text-white"
-                            placeholder="Emergency contact phone"
+                            placeholder="+1234567890"
+                            aria-describedby="emergencyContactPhone-error"
                           />
+                          {errors.emergencyContactPhone && (
+                            <p id="emergencyContactPhone-error" className="text-red-500 text-xs mt-1">
+                              {errors.emergencyContactPhone}
+                            </p>
+                          )}
                         </div>
                         <div>
-                          <label className="block text-slate-300 text-sm font-medium mb-2">Relationship</label>
+                          <label
+                            htmlFor="emergencyContactRelationship"
+                            className="block text-slate-300 text-sm font-medium mb-2"
+                          >
+                            Relationship
+                          </label>
                           <Input
+                            id="emergencyContactRelationship"
                             value={formData.emergencyContactRelationship}
-                            onChange={(e) => setFormData({ ...formData, emergencyContactRelationship: e.target.value })}
+                            onChange={(e) => handleInputChange("emergencyContactRelationship", e.target.value)}
                             className="bg-slate-800 border-slate-700 text-white"
                             placeholder="e.g., Parent, Spouse"
                           />
@@ -346,31 +552,43 @@ export default function ProfilePage() {
                       <h3 className="text-white font-medium text-lg">Medical Information</h3>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                          <label className="block text-slate-300 text-sm font-medium mb-2">Allergies</label>
+                          <label htmlFor="allergies" className="block text-slate-300 text-sm font-medium mb-2">
+                            Allergies
+                          </label>
                           <Input
+                            id="allergies"
                             value={formData.allergies}
-                            onChange={(e) => setFormData({ ...formData, allergies: e.target.value })}
+                            onChange={(e) => handleInputChange("allergies", e.target.value)}
                             className="bg-slate-800 border-slate-700 text-white"
                             placeholder="e.g., Penicillin, Peanuts (comma separated)"
                           />
                         </div>
                         <div>
-                          <label className="block text-slate-300 text-sm font-medium mb-2">Medical Conditions</label>
+                          <label htmlFor="conditions" className="block text-slate-300 text-sm font-medium mb-2">
+                            Medical Conditions
+                          </label>
                           <Input
+                            id="conditions"
                             value={formData.conditions}
-                            onChange={(e) => setFormData({ ...formData, conditions: e.target.value })}
+                            onChange={(e) => handleInputChange("conditions", e.target.value)}
                             className="bg-slate-800 border-slate-700 text-white"
                             placeholder="e.g., Diabetes, Hypertension (comma separated)"
                           />
                         </div>
                       </div>
                       <div className="w-full md:w-1/3">
-                        <label className="block text-slate-300 text-sm font-medium mb-2">Blood Type</label>
+                        <label htmlFor="bloodType" className="block text-slate-300 text-sm font-medium mb-2">
+                          Blood Type
+                        </label>
                         <Select
                           value={formData.bloodType}
-                          onValueChange={(value) => setFormData({ ...formData, bloodType: value })}
+                          onValueChange={(value) => handleInputChange("bloodType", value)}
                         >
-                          <SelectTrigger className="bg-slate-800 border-slate-700 text-white">
+                          <SelectTrigger
+                            id="bloodType"
+                            className="bg-slate-800 border-slate-700 text-white"
+                            aria-label="Select blood type"
+                          >
                             <SelectValue placeholder="Select blood type" />
                           </SelectTrigger>
                           <SelectContent className="bg-slate-900 border-2 border-purple-600 text-white shadow-lg">
@@ -387,7 +605,12 @@ export default function ProfilePage() {
                       </div>
                     </div>
 
-                    <Button type="submit" disabled={loading} className="bg-purple-600 hover:bg-purple-700 text-white">
+                    <Button
+                      type="submit"
+                      disabled={loading || Object.keys(errors).length > 0}
+                      className="bg-purple-600 hover:bg-purple-700 text-white"
+                      aria-label="Update profile"
+                    >
                       {loading ? "Updating..." : "Update Profile"}
                     </Button>
                   </form>
@@ -402,12 +625,18 @@ export default function ProfilePage() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div>
-                    <label className="block text-slate-300 text-sm font-medium mb-2">Theme Preference</label>
+                    <label htmlFor="theme" className="block text-slate-300 text-sm font-medium mb-2">
+                      Theme Preference
+                    </label>
                     <Select
                       value={formData.preferences.theme}
                       onValueChange={(value: "dark" | "light") => handlePreferenceChange("theme", value)}
                     >
-                      <SelectTrigger className="bg-slate-800 border-slate-700 text-white">
+                      <SelectTrigger
+                        id="theme"
+                        className="bg-slate-800 border-slate-700 text-white"
+                        aria-label="Select theme"
+                      >
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent className="bg-slate-800 border-slate-700">
@@ -434,6 +663,7 @@ export default function ProfilePage() {
                     <Switch
                       checked={formData.preferences.medicationReminders}
                       onCheckedChange={(checked) => handlePreferenceChange("medicationReminders", checked)}
+                      aria-label="Toggle medication reminders"
                     />
                   </div>
                   <div className="flex items-center justify-between">
@@ -444,6 +674,7 @@ export default function ProfilePage() {
                     <Switch
                       checked={formData.preferences.appointmentReminders}
                       onCheckedChange={(checked) => handlePreferenceChange("appointmentReminders", checked)}
+                      aria-label="Toggle appointment reminders"
                     />
                   </div>
                   <div className="flex items-center justify-between">
@@ -454,6 +685,7 @@ export default function ProfilePage() {
                     <Switch
                       checked={formData.preferences.healthTips}
                       onCheckedChange={(checked) => handlePreferenceChange("healthTips", checked)}
+                      aria-label="Toggle health tips"
                     />
                   </div>
                   <div className="flex items-center justify-between">
@@ -464,6 +696,7 @@ export default function ProfilePage() {
                     <Switch
                       checked={formData.preferences.emailNotifications}
                       onCheckedChange={(checked) => handlePreferenceChange("emailNotifications", checked)}
+                      aria-label="Toggle email notifications"
                     />
                   </div>
                   <div className="flex items-center justify-between">
@@ -474,6 +707,7 @@ export default function ProfilePage() {
                     <Switch
                       checked={formData.preferences.pushNotifications}
                       onCheckedChange={(checked) => handlePreferenceChange("pushNotifications", checked)}
+                      aria-label="Toggle push notifications"
                     />
                   </div>
                 </CardContent>
@@ -494,9 +728,9 @@ export default function ProfilePage() {
                     <Switch
                       checked={formData.preferences.shareDataForResearch}
                       onCheckedChange={(checked) => handlePreferenceChange("shareDataForResearch", checked)}
+                      aria-label="Toggle data sharing for research"
                     />
                   </div>
-                 
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-white font-medium">Save Conversations</p>
@@ -505,6 +739,7 @@ export default function ProfilePage() {
                     <Switch
                       checked={formData.preferences.saveConversations}
                       onCheckedChange={(checked) => handlePreferenceChange("saveConversations", checked)}
+                      aria-label="Toggle save conversations"
                     />
                   </div>
                 </CardContent>
@@ -522,10 +757,16 @@ export default function ProfilePage() {
                       onClick={handleExportData}
                       variant="outline"
                       className="bg-slate-800 border-slate-700 text-white hover:bg-slate-700"
+                      aria-label="Export my data"
                     >
                       📤 Export My Data
                     </Button>
-                    <Button onClick={handleClearData} variant="destructive" className="bg-red-600 hover:bg-red-700">
+                    <Button
+                      onClick={handleClearData}
+                      variant="destructive"
+                      className="bg-red-600 hover:bg-red-700"
+                      aria-label="Clear all data"
+                    >
                       🗑️ Clear All Data
                     </Button>
                   </div>
@@ -539,5 +780,5 @@ export default function ProfilePage() {
         </div>
       </div>
     </AuthGuard>
-  )
+  );
 }
