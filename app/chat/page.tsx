@@ -19,10 +19,19 @@ import {
   addMessageToSession,
   subscribeToUserChatSessions,
   type ChatSession,
-  type PrescriptionAnalysis,
 } from "@/lib/firestore"
 import { toast } from "sonner"
 import Link from "next/link"
+
+interface PrescriptionAnalysis {
+  medications: string[]
+  dosages: string[]
+  instructions: string
+  warnings: string[]
+  userId?: string
+  fileName?: string
+  createdAt?: Date
+}
 
 export default function ChatPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -37,6 +46,8 @@ export default function ChatPage() {
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null)
   const [editedMessage, setEditedMessage] = useState("")
   const [selectedModel, setSelectedModel] = useState("gemini-1.5-flash-latest")
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [fileName, setFileName] = useState<string>("")
   const { user, userProfile } = useAuth()
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -97,17 +108,20 @@ export default function ChatPage() {
       return
     }
 
-    if (!message.trim() && !fileInputRef.current?.files?.length) return
+    if (!message.trim() && !selectedFile) return
 
-    const userMessage = message.trim()
+    const userMessage = message.trim() || "Image uploaded"
     setMessage("")
+    setSelectedFile(null)
+    setFileName("")
+    if (fileInputRef.current) fileInputRef.current.value = ""
     setLoading(true)
 
     try {
       let sessionToUse = currentSession
 
       if (!sessionToUse) {
-        const smartTitle = userMessage ? generateChatTitle(userMessage) : "Image Analysis"
+        const smartTitle = message.trim() ? generateChatTitle(message) : "Image Analysis"
         const sessionId = await createChatSession(user.uid, smartTitle)
         sessionToUse = {
           id: sessionId,
@@ -121,18 +135,17 @@ export default function ChatPage() {
       }
 
       let botResponse = ""
-      if (userMessage) {
-        botResponse = await generateAIResponse(userMessage)
+      if (message.trim()) {
+        botResponse = await generateAIResponse(message)
       }
-      if (fileInputRef.current?.files?.length) {
-        const file = fileInputRef.current.files[0]
-        const analysis = await analyzePrescription(file)
-        botResponse = `Prescription Analysis:\nMedications: ${analysis.medications.join(", ")}\nDosages: ${analysis.dosages.join(", ")}\nInstructions: ${analysis.instructions}${analysis.warnings.length ? "\nWarnings: " + analysis.warnings.join(", ") : ""}`
-        fileInputRef.current.value = ""
+      if (selectedFile) {
+        const analysis = await analyzePrescription(selectedFile)
+        const analysisText = `**Prescription Analysis**:\n- **Medications**: ${analysis.medications.join(", ")}\n- **Dosages**: ${analysis.dosages.join(", ")}\n- **Instructions**: ${analysis.instructions}${analysis.warnings.length ? "\n- **Warnings**: " + analysis.warnings.join(", ") : ""}`
+        botResponse = botResponse ? `${botResponse}\n\n${analysisText}` : analysisText
       }
 
       if (sessionToUse.id) {
-        const newMessage = await addMessageToSession(sessionToUse.id, user.uid, userMessage || "Image uploaded", botResponse, "chat")
+        const newMessage = await addMessageToSession(sessionToUse.id, user.uid, userMessage, botResponse, "chat")
 
         setCurrentSession((prev) => {
           if (!prev) return prev
@@ -143,13 +156,17 @@ export default function ChatPage() {
           }
         })
 
-        sendMessageNotification(userMessage || "Image uploaded", botResponse)
+        sendMessageNotification(userMessage, botResponse)
         toast.success("Message sent!")
       }
     } catch (error) {
       console.error("Error sending message:", error)
       toast.error("Failed to send message. Please try again.")
-      setMessage(userMessage)
+      setMessage(message)
+      if (selectedFile) {
+        setSelectedFile(selectedFile)
+        setFileName(selectedFile.name)
+      }
     } finally {
       setLoading(false)
     }
@@ -281,10 +298,6 @@ export default function ChatPage() {
         ? "https://api.x.ai/v1/models/grok:analyzePrescription" // Dummy Grok API
         : `https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:generateContent`
 
-      const formData = new FormData()
-      formData.append("file", file)
-      formData.append("prompt", `Analyze this prescription image and extract medications, dosages, instructions, and any warnings. Return the response in JSON format with fields: medications (array), dosages (array), instructions (string), warnings (array).`)
-
       const response = await fetch(
         `${endpoint}?key=${process.env.NEXT_PUBLIC_GEMINI_API_KEY}`,
         {
@@ -318,27 +331,36 @@ export default function ChatPage() {
       }
 
       const data = await response.json()
-      const result = JSON.parse(data.candidates?.[0]?.content?.parts?.[0]?.text || "{}")
+      let responseText = data.candidates?.[0]?.content?.parts?.[0]?.text || "{}"
+      
+      // Clean response text by removing markdown code fences and backticks
+      responseText = responseText
+        .replace(/```json/g, "")
+        .replace(/```/g, "")
+        .replace(/`/g, "")
+        .trim()
 
-        return {
-          userId: user?.uid || "unknown",
-          fileName: file.name,
-          createdAt: new Date(),
-          medications: result.medications || ["Unknown"],
-          dosages: result.dosages || ["Unknown"],
-          instructions: result.instructions || "No instructions provided.",
-          warnings: result.warnings || [],
-        }
-      } catch (error) {
-        console.error("Error analyzing prescription:", error)
-        return {
-          userId: user?.uid || "unknown",
-          fileName: file.name,
-          createdAt: new Date(),
-          medications: ["Error"],
-          dosages: ["N/A"],
-          instructions: "Failed to analyze prescription.",
-          warnings: ["Please try again or consult a healthcare professional."],
+      let result
+      try {
+        result = JSON.parse(responseText)
+      } catch (parseError) {
+        console.error("JSON parse error:", parseError)
+        throw new Error("Invalid JSON response")
+      }
+
+      return {
+        medications: result.medications || ["Unknown"],
+        dosages: result.dosages || ["Unknown"],
+        instructions: result.instructions || "No instructions provided.",
+        warnings: result.warnings || [],
+      }
+    } catch (error) {
+      console.error("Error analyzing prescription:", error)
+      return {
+        medications: ["Error"],
+        dosages: ["N/A"],
+        instructions: "Failed to analyze prescription.",
+        warnings: ["Please try again or consult a healthcare professional."],
       }
     }
   }
@@ -387,27 +409,23 @@ export default function ChatPage() {
     fileInputRef.current?.click()
   }
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!user) {
-      toast.error("Please log in to analyze prescriptions")
+      toast.error("Please log in to upload files")
       return
     }
 
     const file = e.target.files?.[0]
     if (!file) return
 
-    setAnalyzingPrescription(true)
+    setSelectedFile(file)
+    setFileName(file.name)
+  }
 
-    try {
-      const analysis = await analyzePrescription(file)
-      setAnalysisResult(analysis)
-      toast.success("Prescription analyzed successfully!")
-    } catch (error) {
-      console.error("Error analyzing prescription:", error)
-      toast.error("Failed to analyze prescription")
-    } finally {
-      setAnalyzingPrescription(false)
-    }
+  const removeFile = () => {
+    setSelectedFile(null)
+    setFileName("")
+    if (fileInputRef.current) fileInputRef.current.value = ""
   }
 
   const handleHistoryDialog = () => {
@@ -452,7 +470,11 @@ export default function ChatPage() {
         {msg.type === "bot" && (
           <div className="flex-1 max-w-[80%] sm:max-w-3xl">
             <div className="bg-slate-800 rounded-xl rounded-tl-md p-3 sm:p-4 text-slate-300 text-xs sm:text-sm leading-relaxed border border-slate-700 whitespace-pre-wrap">
-              {msg.content}
+              {msg.content.split("\n").map((line, index) => (
+                <p key={index} className={line.startsWith("**") ? "font-semibold" : ""}>
+                  {line}
+                </p>
+              ))}
               <div className="flex space-x-2 mt-2">
                 <Button
                   variant="ghost"
@@ -691,52 +713,75 @@ export default function ChatPage() {
           {user && (
             <div className="p-3 sm:p-4 md:p-6 border-t border-slate-800 bg-slate-900 sticky bottom-0">
               <div className="max-w-full sm:max-w-3xl md:max-w-4xl mx-auto">
-                <div className="flex items-center space-x-2 sm:space-x-3">
-                  <Button
-                    onClick={handleFileUpload}
-                    variant="ghost"
-                    size="icon"
-                    className="text-slate-400 hover:text-white hover:bg-slate-800 transition-colors h-10 w-10 sm:h-11 sm:w-11 md:h-12 md:w-12"
-                    title="Upload Image"
-                  >
-                    <Upload className="h-4 w-4 sm:h-5 sm:w-5" />
-                  </Button>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    onChange={handleFileChange}
-                    className="hidden"
-                  />
-                  <Select value={selectedModel} onValueChange={setSelectedModel}>
-                    <SelectTrigger className="w-[140px] sm:w-[160px] bg-slate-800 border-slate-700 text-white text-xs sm:text-sm h-10 sm:h-11 md:h-12">
-                      <SelectValue placeholder="Select AI Model" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-slate-800 border-slate-700 text-white">
-                      <SelectItem value="gemini-1.5-flash-latest">Gemini 1.5 Flash</SelectItem>
-                      <SelectItem value="gemini-1.5-pro-latest">Gemini 1.5 Pro</SelectItem>
-                      <SelectItem value="grok">Grok (Beta)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <div className="flex-1 relative">
-                    <Input
-                      value={message}
-                      onChange={(e) => setMessage(e.target.value)}
-                      onKeyPress={handleKeyPress}
-                      placeholder="Ask a health question or upload an image..."
-                      className="bg-slate-800 border-slate-700 text-white placeholder-slate-400 h-10 sm:h-11 md:h-12 rounded-xl pr-10 sm:pr-12 text-xs sm:text-sm md:text-base"
-                      disabled={loading}
-                      maxLength={1000}
-                    />
+                <div className="flex flex-col space-y-2">
+                  <div className="flex items-center space-x-2 sm:space-x-3">
+                    <div className="relative flex-1">
+                      <Input
+                        value={message}
+                        onChange={(e) => setMessage(e.target.value)}
+                        onKeyPress={handleKeyPress}
+                        placeholder="Ask a health question or upload an image..."
+                        className="bg-slate-800 border-slate-700 text-white placeholder-slate-400 h-10 sm:h-11 md:h-12 rounded-xl pr-36 sm:pr-40 text-xs sm:text-sm md:text-base"
+                        disabled={loading}
+                        maxLength={1000}
+                      />
+                      <div className="absolute right-2 top-1/2 transform -translate-y-1/2 flex items-center space-x-1">
+                        <Button
+                          onClick={handleFileUpload}
+                          variant="ghost"
+                          size="icon"
+                          className="text-slate-400 hover:text-white hover:bg-slate-800 h-6 w-6 sm:h-7 sm:w-7"
+                          title="Upload Image"
+                        >
+                          <Upload className="h-4 w-4 sm:h-5 sm:w-5" />
+                        </Button>
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          accept="image/*"
+                          onChange={handleFileChange}
+                          className="hidden"
+                        />
+                        <Select value={selectedModel} onValueChange={setSelectedModel}>
+                          <SelectTrigger className="w-[100px] sm:w-[120px] bg-slate-800 border-none text-white text-xs h-6 sm:h-7 focus:ring-0">
+                            <SelectValue placeholder="Model" />
+                          </SelectTrigger>
+                          <SelectContent className="bg-slate-800 border-slate-700 text-white text-xs">
+                            <SelectItem value="gemini-1.5-flash-latest">Gemini 1.5 Flash</SelectItem>
+                            <SelectItem value="gemini-1.5-pro-latest">Gemini 1.5 Pro</SelectItem>
+                            <SelectItem value="grok">Grok (Beta)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <Button
+                      onClick={handleSendMessage}
+                      disabled={loading || (!message.trim() && !selectedFile)}
+                      size="icon"
+                      className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white rounded-full h-10 w-10 sm:h-11 sm:w-11 md:h-12 md:w-12 shadow-lg disabled:opacity-50"
+                    >
+                      <Send className="h-4 w-4 sm:h-5 sm:w-5" />
+                    </Button>
                   </div>
-                  <Button
-                    onClick={handleSendMessage}
-                    disabled={loading || (!message.trim() && !fileInputRef.current?.files?.length)}
-                    size="icon"
-                    className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white rounded-full h-10 w-10 sm:h-11 sm:w-11 md:h-12 md:w-12 shadow-lg disabled:opacity-50"
-                  >
-                    <Send className="h-4 w-4 sm:h-5 sm:w-5" />
-                  </Button>
+                  {fileName && (
+                    <div className="flex items-center space-x-2">
+                      <Badge
+                        variant="secondary"
+                        className="bg-slate-700 text-slate-300 text-xs truncate max-w-[200px] sm:max-w-[300px]"
+                      >
+                        {fileName}
+                      </Badge>
+                      <Button
+                        onClick={removeFile}
+                        variant="ghost"
+                        size="icon"
+                        className="text-slate-400 hover:text-red-500 h-6 w-6"
+                        title="Remove File"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -781,7 +826,31 @@ export default function ChatPage() {
                       )}
                     </div>
 
-                    <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0]
+                        if (file) {
+                          setAnalyzingPrescription(true)
+                          analyzePrescription(file)
+                            .then((analysis) => {
+                              setAnalysisResult(analysis)
+                              toast.success("Prescription analyzed successfully!")
+                            })
+                            .catch((error) => {
+                              console.error("Error analyzing prescription:", error)
+                              toast.error("Failed to analyze prescription")
+                            })
+                            .finally(() => {
+                              setAnalyzingPrescription(false)
+                              if (fileInputRef.current) fileInputRef.current.value = ""
+                            })
+                        }
+                      }}
+                      className="hidden"
+                    />
 
                     <p className="text-xs text-slate-500">
                       Supported formats: JPG, PNG, HEIC. This feature analyzes prescription information for educational
@@ -851,9 +920,8 @@ export default function ChatPage() {
                         )}
 
                         <div className="bg-blue-900/20 border border-blue-700 p-3 sm:p-4 rounded-lg">
-                          <p className="text-blue-300 text-xs sm:text-sm">
-                            <strong>Important:</strong> This analysis is for informational purposes only. Always follow your
-                            doctor's instructions and consult your pharmacist for any questions about your medications.
+                          <p className="text-blue-300 text-sm">
+                            <strong>Important:</strong> This analysis is for informational purposes only. Always follow your doctor's instructions and consult your pharmacist.
                           </p>
                         </div>
                       </CardContent>
@@ -866,13 +934,13 @@ export default function ChatPage() {
                           setPrescriptionDialogOpen(false)
                         }}
                         variant="outline"
-                        className="flex-1 border-slate-700 text-slate-400 hover:text-white text-xs sm:text-sm"
+                        className="flex-1 border text-sm text-slate-400 hover:text-white"
                       >
                         Close
                       </Button>
                       <Button
                         onClick={() => setAnalysisResult(null)}
-                        className="flex-1 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-xs sm:text-sm"
+                        className="flex-1 bg-gradient-to-br from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-sm"
                       >
                         Analyze Another
                       </Button>
@@ -883,33 +951,33 @@ export default function ChatPage() {
             </Dialog>
 
             <Dialog open={historyDialogOpen} onOpenChange={setHistoryDialogOpen}>
-              <DialogContent className="bg-slate-900 border-slate-800 text-white max-w-[90vw] sm:max-w-2xl mx-auto max-h-[90vh] sm:max-h-[80vh] overflow-hidden sm:rounded-lg p-4 sm:p-6">
+              <DialogContent className="bg-white border-gray-200 text-gray-900 max-w-md mx-auto p-6 sm:p-6">
                 <DialogHeader>
-                  <DialogTitle className="flex items-center justify-between text-sm sm:text-base">
+                  <DialogTitle className="flex items-center justify-between text-base sm:text-lg">
                     <div className="flex items-center space-x-2">
-                      <RotateCcw className="h-4 w-4 sm:h-5 sm:w-5" />
+                      <RotateCcw className="h-5 w-5" />
                       <span>Recent Chats</span>
                     </div>
                     <Button
                       variant="ghost"
                       size="icon"
                       onClick={() => setHistoryDialogOpen(false)}
-                      className="text-slate-400 hover:text-white h-8 w-8 sm:h-10 sm:w-10"
+                      className="text-gray-500 hover:text-gray-700 h-10 w-10"
                     >
-                      <X className="h-3 w-3 sm:h-4 sm:w-4" />
+                      <X className="h-4 w-4" />
                     </Button>
                   </DialogTitle>
                 </DialogHeader>
 
-                <div className="space-y-3 sm:space-y-4 overflow-y-auto max-h-80 sm:max-h-96">
+                <div className="space-y-4 overflow-y-auto max-h-96">
                   {sessions.length > 0 ? (
                     sessions.slice(0, 10).map((session) => (
                       <div
                         key={session.id}
-                        className={`p-3 sm:p-4 rounded-lg border cursor-pointer transition-colors ${
+                        className={`p-4 rounded-lg border cursor-pointer transition-colors ${
                           currentSession?.id === session.id
-                            ? "bg-purple-600/20 border-purple-600"
-                            : "bg-slate-800 border-slate-700 hover:bg-slate-700"
+                            ? "bg-blue-50 border-blue-500"
+                            : "bg-gray-100 border-gray-200 hover:bg-gray-200"
                         }`}
                         onClick={() => {
                           setCurrentSession(session)
@@ -918,16 +986,16 @@ export default function ChatPage() {
                       >
                         <div className="flex items-start justify-between">
                           <div className="flex-1">
-                            <h3 className="text-white font-medium text-xs sm:text-sm truncate">{session.title}</h3>
-                            <p className="text-slate-400 text-xs sm:text-sm">
-                              {(session.messages ?? []).length} messages •{" "}
+                            <h3 className="text-gray-900 font-medium text-sm truncate">{session.title}</h3>
+                            <p className="text-gray-500 text-sm">
+                              {(session.messages || []).length} messages •{" "}
                               {session.updatedAt instanceof Date
                                 ? session.updatedAt.toLocaleDateString()
                                 : (session.updatedAt as any)?.toDate?.()?.toLocaleDateString() || "Recently"}
                             </p>
-                            {(session.messages ?? []).length > 0 && (
-                              <p className="text-slate-500 text-xs sm:text-sm mt-1 truncate">
-                                {session.messages[session.messages.length - 1]?.message ?? "No messages"}
+                            {(session.messages || []).length > 0 && (
+                              <p className="text-gray-400 text-sm mt-1 truncate">
+                                {session.messages[session.messages.length - 1]?.message || "No messages"}
                               </p>
                             )}
                           </div>
@@ -935,19 +1003,19 @@ export default function ChatPage() {
                       </div>
                     ))
                   ) : (
-                    <div className="text-center py-6 sm:py-8">
-                      <RotateCcw className="h-10 w-10 sm:h-12 sm:w-12 text-slate-600 mx-auto mb-3 sm:mb-4" />
-                      <p className="text-slate-400 text-xs sm:text-sm">No chat history yet</p>
-                      <p className="text-slate-500 text-xs sm:text-sm">Start a conversation to see your history here</p>
+                    <div className="text-center py-8">
+                      <RotateCcw className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                      <p className="text-gray-500 text-sm">No chat history yet</p>
+                      <p className="text-gray-400 text-sm">Start a conversation to see your history here</p>
                     </div>
                   )}
                 </div>
 
-                <div className="flex justify-end pt-3 sm:pt-4 border-t border-slate-800">
+                <div className="flex justify-end pt-4 border-t border-gray-200">
                   <Link href="/history">
                     <Button
                       variant="outline"
-                      className="border-slate-700 text-slate-400 hover:text-white text-xs sm:text-sm"
+                      className="border-gray-300 text-gray-600 hover:text-gray-800 text-sm"
                       onClick={() => setHistoryDialogOpen(false)}
                     >
                       View Full History
@@ -962,4 +1030,3 @@ export default function ChatPage() {
     </AuthGuard>
   )
 }
-
