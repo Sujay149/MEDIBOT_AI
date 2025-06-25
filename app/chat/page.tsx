@@ -61,25 +61,17 @@ export default function ChatPage() {
         messages: session.messages ?? [],
       }))
       setSessions(normalizedSessions)
+      if (!currentSession && normalizedSessions.length > 0) {
+        setCurrentSession(normalizedSessions[0])
+      }
     })
 
     return () => unsubscribe()
-  }, [user])
+  }, [user, currentSession])
 
   useEffect(() => {
     scrollToBottom()
   }, [currentSession?.messages])
-
-  useEffect(() => {
-    const handleBeforeUnload = () => {
-      setCurrentSession(null)
-    }
-
-    window.addEventListener("beforeunload", handleBeforeUnload)
-    return () => {
-      window.removeEventListener("beforeunload", handleBeforeUnload)
-    }
-  }, [])
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -959,33 +951,33 @@ export default function ChatPage() {
             </Dialog>
 
             <Dialog open={historyDialogOpen} onOpenChange={setHistoryDialogOpen}>
-              <DialogContent className="bg-slate-900 border-slate-800 text-white max-w-[90vw] sm:max-w-md mx-auto p-4 sm:p-6 max-h-[80vh] overflow-y-auto">
+              <DialogContent className="bg-white border-gray-200 text-gray-900 max-w-md mx-auto p-6 sm:p-6">
                 <DialogHeader>
-                  <DialogTitle className="flex items-center justify-between text-sm sm:text-base">
+                  <DialogTitle className="flex items-center justify-between text-base sm:text-lg">
                     <div className="flex items-center space-x-2">
-                      <RotateCcw className="h-4 w-4 sm:h-5 sm:w-5" />
+                      <RotateCcw className="h-5 w-5" />
                       <span>Recent Chats</span>
                     </div>
                     <Button
                       variant="ghost"
                       size="icon"
                       onClick={() => setHistoryDialogOpen(false)}
-                      className="text-slate-400 hover:text-white h-8 w-8"
+                      className="text-gray-500 hover:text-gray-700 h-10 w-10"
                     >
                       <X className="h-4 w-4" />
                     </Button>
                   </DialogTitle>
                 </DialogHeader>
 
-                <div className="space-y-4">
+                <div className="space-y-4 overflow-y-auto max-h-96">
                   {sessions.length > 0 ? (
                     sessions.slice(0, 10).map((session) => (
                       <div
                         key={session.id}
-                        className={`p-3 sm:p-4 rounded-lg border cursor-pointer transition-colors ${
+                        className={`p-4 rounded-lg border cursor-pointer transition-colors ${
                           currentSession?.id === session.id
-                            ? "bg-blue-900/20 border-blue-700"
-                            : "bg-slate-800 border-slate-700 hover:bg-slate-700"
+                            ? "bg-blue-50 border-blue-500"
+                            : "bg-gray-100 border-gray-200 hover:bg-gray-200"
                         }`}
                         onClick={() => {
                           setCurrentSession(session)
@@ -994,15 +986,15 @@ export default function ChatPage() {
                       >
                         <div className="flex items-start justify-between">
                           <div className="flex-1">
-                            <h3 className="text-white font-medium text-sm truncate">{session.title}</h3>
-                            <p className="text-slate-400 text-xs sm:text-sm">
+                            <h3 className="text-gray-900 font-medium text-sm truncate">{session.title}</h3>
+                            <p className="text-gray-500 text-sm">
                               {(session.messages || []).length} messages •{" "}
                               {session.updatedAt instanceof Date
                                 ? session.updatedAt.toLocaleDateString()
                                 : (session.updatedAt as any)?.toDate?.()?.toLocaleDateString() || "Recently"}
                             </p>
                             {(session.messages || []).length > 0 && (
-                              <p className="text-slate-500 text-xs sm:text-sm mt-1 truncate">
+                              <p className="text-gray-400 text-sm mt-1 truncate">
                                 {session.messages[session.messages.length - 1]?.message || "No messages"}
                               </p>
                             )}
@@ -1012,18 +1004,18 @@ export default function ChatPage() {
                     ))
                   ) : (
                     <div className="text-center py-8">
-                      <RotateCcw className="h-12 w-12 text-slate-400 mx-auto mb-4" />
-                      <p className="text-slate-400 text-sm">No chat history yet</p>
-                      <p className="text-slate-500 text-sm">Start a conversation to see your history here</p>
+                      <RotateCcw className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                      <p className="text-gray-500 text-sm">No chat history yet</p>
+                      <p className="text-gray-400 text-sm">Start a conversation to see your history here</p>
                     </div>
                   )}
                 </div>
 
-                <div className="flex justify-end pt-4 border-t border-slate-800">
+                <div className="flex justify-end pt-4 border-t border-gray-200">
                   <Link href="/history">
                     <Button
                       variant="outline"
-                      className="border-slate-700 text-slate-400 hover:text-white text-sm"
+                      className="border-gray-300 text-gray-600 hover:text-gray-800 text-sm"
                       onClick={() => setHistoryDialogOpen(false)}
                     >
                       View Full History

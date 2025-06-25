@@ -53,6 +53,7 @@
     "next": "15.2.4",
     "next-pwa": "^5.6.0",
     "next-themes": "latest",
+    "nodemailer": "^7.0.3",
     "react": "^19",
     "react-day-picker": "8.10.1",
     "react-dom": "^19",
@@ -72,6 +73,7 @@
   "devDependencies": {
     "@types/googlemaps": "^3.43.3",
     "@types/node": "^22",
+    "@types/nodemailer": "^6.4.17",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/react-syntax-highlighter": "^15.5.13",

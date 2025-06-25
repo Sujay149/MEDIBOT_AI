@@ -36,6 +36,7 @@ export function Sidebar({ isOpen = true, onClose }: SidebarProps) {
     { icon: Pill, label: "Medications", href: "/medications" },
     { icon: History, label: "Chat History", href: "/history" },
     { icon: User, label: "My Profile", href: "/profile" },
+    { icon: User, label: "Feedback", href: "/feedback" },
   ]
 
   const handleSignOut = async () => {
