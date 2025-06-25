@@ -145,7 +145,7 @@ export default function DashboardPage() {
   />
 </div>
 
-              <span className="text-purple-400 font-semibold">{userProfile?.displayName || "User"}'s  Dashboard</span>
+              <span className="text-white font-semibold">{userProfile?.displayName || "User"}'s  Dashboard</span>
             </div>
           </div>
 
