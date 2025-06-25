@@ -11,13 +11,13 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Menu, Camera, RotateCcw, Plus, Send, Upload, X, FileText, Pill, AlertCircle } from "lucide-react"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Menu, Camera, RotateCcw, Plus, Send, Upload, X, FileText, Pill, AlertCircle, Copy, ThumbsUp, ThumbsDown, Edit } from "lucide-react"
 import { useAuth } from "@/hooks/useAuth"
 import {
   createChatSession,
   addMessageToSession,
   subscribeToUserChatSessions,
-  analyzePrescription,
   type ChatSession,
   type PrescriptionAnalysis,
 } from "@/lib/firestore"
@@ -34,6 +34,9 @@ export default function ChatPage() {
   const [historyDialogOpen, setHistoryDialogOpen] = useState(false)
   const [analysisResult, setAnalysisResult] = useState<PrescriptionAnalysis | null>(null)
   const [analyzingPrescription, setAnalyzingPrescription] = useState(false)
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null)
+  const [editedMessage, setEditedMessage] = useState("")
+  const [selectedModel, setSelectedModel] = useState("gemini-1.5-flash-latest")
   const { user, userProfile } = useAuth()
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -94,7 +97,7 @@ export default function ChatPage() {
       return
     }
 
-    if (!message.trim() || loading) return
+    if (!message.trim() && !fileInputRef.current?.files?.length) return
 
     const userMessage = message.trim()
     setMessage("")
@@ -104,7 +107,7 @@ export default function ChatPage() {
       let sessionToUse = currentSession
 
       if (!sessionToUse) {
-        const smartTitle = generateChatTitle(userMessage)
+        const smartTitle = userMessage ? generateChatTitle(userMessage) : "Image Analysis"
         const sessionId = await createChatSession(user.uid, smartTitle)
         sessionToUse = {
           id: sessionId,
@@ -117,10 +120,19 @@ export default function ChatPage() {
         setCurrentSession(sessionToUse)
       }
 
-      const botResponse = await generateAIResponse(userMessage)
+      let botResponse = ""
+      if (userMessage) {
+        botResponse = await generateAIResponse(userMessage)
+      }
+      if (fileInputRef.current?.files?.length) {
+        const file = fileInputRef.current.files[0]
+        const analysis = await analyzePrescription(file)
+        botResponse = `Prescription Analysis:\nMedications: ${analysis.medications.join(", ")}\nDosages: ${analysis.dosages.join(", ")}\nInstructions: ${analysis.instructions}${analysis.warnings.length ? "\nWarnings: " + analysis.warnings.join(", ") : ""}`
+        fileInputRef.current.value = ""
+      }
 
       if (sessionToUse.id) {
-        const newMessage = await addMessageToSession(sessionToUse.id, user.uid, userMessage, botResponse, "chat")
+        const newMessage = await addMessageToSession(sessionToUse.id, user.uid, userMessage || "Image uploaded", botResponse, "chat")
 
         setCurrentSession((prev) => {
           if (!prev) return prev
@@ -131,7 +143,7 @@ export default function ChatPage() {
           }
         })
 
-        sendMessageNotification(userMessage, botResponse)
+        sendMessageNotification(userMessage || "Image uploaded", botResponse)
         toast.success("Message sent!")
       }
     } catch (error) {
@@ -141,6 +153,54 @@ export default function ChatPage() {
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleEditMessage = async (messageId: string, originalMessage: string) => {
+    if (!user) {
+      toast.error("Please log in to edit messages")
+      return
+    }
+
+    if (editingMessageId === messageId) {
+      if (!editedMessage.trim()) {
+        toast.error("Message cannot be empty")
+        return
+      }
+
+      try {
+        setLoading(true)
+        const botResponse = await generateAIResponse(editedMessage)
+        const sessionId = currentSession?.id
+        if (sessionId) {
+          const updatedMessages = (currentSession?.messages ?? []).map((msg, index) =>
+            `user-${index}` === messageId ? { ...msg, message: editedMessage, response: botResponse } : msg
+          )
+          await addMessageToSession(sessionId, user.uid, editedMessage, botResponse, "chat")
+          setCurrentSession((prev) => (prev ? { ...prev, messages: updatedMessages } : prev))
+          toast.success("Message updated!")
+        }
+      } catch (error) {
+        console.error("Error editing message:", error)
+        toast.error("Failed to edit message")
+      } finally {
+        setEditingMessageId(null)
+        setEditedMessage("")
+        setLoading(false)
+      }
+    } else {
+      setEditingMessageId(messageId)
+      setEditedMessage(originalMessage)
+    }
+  }
+
+  const handleCopyText = (text: string) => {
+    navigator.clipboard.writeText(text)
+    toast.success("Copied to clipboard!")
+  }
+
+  const handleFeedback = (messageId: string, isPositive: boolean) => {
+    toast.success(isPositive ? "Thanks for the thumbs up!" : "Thanks for the feedback!")
+    // Future: Log feedback to Firestore or analytics
   }
 
   const generateChatTitle = (firstMessage: string): string => {
@@ -172,40 +232,127 @@ export default function ChatPage() {
 
   const generateAIResponse = async (userMessage: string): Promise<string> => {
     try {
-      const response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=AIzaSyDNHY0ptkqYXxknm1qJYP_tCw2A12be_gM", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          contents: [
-            {
-              parts: [
-                {
-                  text: `You are Medibot, a health-focused AI assistant. Provide a concise, informative, and professional response to the following health-related user query. Ensure the response is educational, not a substitute for professional medical advice, and includes a reminder to consult a healthcare professional for personalized advice. Query: ${userMessage}`
-                }
-              ]
+      const endpoint = selectedModel === "grok" 
+        ? "https://api.x.ai/v1/models/grok:generateContent" // Dummy Grok API
+        : `https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:generateContent`
+      
+      const response = await fetch(
+        `${endpoint}?key=${process.env.NEXT_PUBLIC_GEMINI_API_KEY}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            contents: [
+              {
+                parts: [
+                  {
+                    text: `You are Medibot, a health-focused AI assistant. Provide a concise, informative, and professional response to the following health-related user query. Ensure the response is educational, not a substitute for professional medical advice, and includes a reminder to consult a healthcare professional for personalized advice. Query: ${userMessage}`
+                  }
+                ]
+              }
+            ],
+            generationConfig: {
+              temperature: 0.7,
+              maxOutputTokens: 200,
             }
-          ],
-          generationConfig: {
-            temperature: 0.7,
-            maxOutputTokens: 200,
-          }
-        }),
-      })
+          }),
+        }
+      )
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`)
       }
 
       const data = await response.json()
-      const botResponse = data.candidates[0].content.parts[0].text.trim()
+      const botResponse = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "No response generated."
 
       return botResponse
     } catch (error) {
-      console.error("Error calling Gemini API:", error)
+      console.error("Error calling AI API:", error)
       return "I'm sorry, I couldn't process your request at this time. Please try again later or consult a healthcare professional for personalized advice."
     }
+  }
+
+  const analyzePrescription = async (file: File): Promise<PrescriptionAnalysis> => {
+    try {
+      const endpoint = selectedModel === "grok"
+        ? "https://api.x.ai/v1/models/grok:analyzePrescription" // Dummy Grok API
+        : `https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:generateContent`
+
+      const formData = new FormData()
+      formData.append("file", file)
+      formData.append("prompt", `Analyze this prescription image and extract medications, dosages, instructions, and any warnings. Return the response in JSON format with fields: medications (array), dosages (array), instructions (string), warnings (array).`)
+
+      const response = await fetch(
+        `${endpoint}?key=${process.env.NEXT_PUBLIC_GEMINI_API_KEY}`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            contents: [
+              {
+                parts: [
+                  {
+                    text: `Analyze this prescription image and extract medications, dosages, instructions, and any warnings. Return the response in JSON format with fields: medications (array), dosages (array), instructions (string), warnings (array).`
+                  },
+                  {
+                    inlineData: {
+                      mimeType: file.type,
+                      data: await fileToBase64(file)
+                    }
+                  }
+                ]
+              }
+            ],
+            generationConfig: {
+              temperature: 0.5,
+              maxOutputTokens: 500,
+            }
+          }),
+        }
+      )
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      const data = await response.json()
+      const result = JSON.parse(data.candidates?.[0]?.content?.parts?.[0]?.text || "{}")
+
+        return {
+          userId: user?.uid || "unknown",
+          fileName: file.name,
+          createdAt: new Date(),
+          medications: result.medications || ["Unknown"],
+          dosages: result.dosages || ["Unknown"],
+          instructions: result.instructions || "No instructions provided.",
+          warnings: result.warnings || [],
+        }
+      } catch (error) {
+        console.error("Error analyzing prescription:", error)
+        return {
+          userId: user?.uid || "unknown",
+          fileName: file.name,
+          createdAt: new Date(),
+          medications: ["Error"],
+          dosages: ["N/A"],
+          instructions: "Failed to analyze prescription.",
+          warnings: ["Please try again or consult a healthcare professional."],
+      }
+    }
+  }
+
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => {
+        const base64String = (reader.result as string).split(",")[1]
+        resolve(base64String)
+      }
+      reader.onerror = () => reject(new Error("Failed to read file"))
+      reader.readAsDataURL(file)
+    })
   }
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -215,7 +362,11 @@ export default function ChatPage() {
     }
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault()
-      handleSendMessage()
+      if (editingMessageId) {
+        handleEditMessage(editingMessageId, editedMessage)
+      } else {
+        handleSendMessage()
+      }
     }
   }
 
@@ -248,8 +399,7 @@ export default function ChatPage() {
     setAnalyzingPrescription(true)
 
     try {
-      await new Promise((resolve) => setTimeout(resolve, 3000))
-      const analysis = await analyzePrescription(user.uid, file.name, "Prescription uploaded for analysis")
+      const analysis = await analyzePrescription(file)
       setAnalysisResult(analysis)
       toast.success("Prescription analyzed successfully!")
     } catch (error) {
@@ -300,26 +450,75 @@ export default function ChatPage() {
         className={`flex ${msg.type === "user" ? "justify-end" : "items-start space-x-2 sm:space-x-3"} mb-3 sm:mb-4`}
       >
         {msg.type === "bot" && (
-          <>
-            <Avatar className="w-8 h-8 sm:w-10 sm:h-10 mt-1 flex-shrink-0">
-              <AvatarImage src="/logo.png" alt="Medibot" />
-              <AvatarFallback className="bg-purple-600 text-white text-xs sm:text-sm font-semibold">
-                <Image src="/logo.png" alt="M" width={20} height={20} className="rounded-full" />
-              </AvatarFallback>
-            </Avatar>
-            <div className="flex-1 max-w-[80%] sm:max-w-3xl">
-              <p className="text-white font-medium text-xs sm:text-sm mb-1 sm:mb-2">Medibot</p>
-              <div className="bg-slate-800 rounded-xl rounded-tl-md p-3 sm:p-4 text-slate-300 text-xs sm:text-sm leading-relaxed border border-slate-700 whitespace-pre-wrap">
-                {msg.content}
+          <div className="flex-1 max-w-[80%] sm:max-w-3xl">
+            <div className="bg-slate-800 rounded-xl rounded-tl-md p-3 sm:p-4 text-slate-300 text-xs sm:text-sm leading-relaxed border border-slate-700 whitespace-pre-wrap">
+              {msg.content}
+              <div className="flex space-x-2 mt-2">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => handleCopyText(msg.content)}
+                  className="text-slate-400 hover:text-white h-6 w-6"
+                  title="Copy Response"
+                >
+                  <Copy className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => handleFeedback(msg.id, true)}
+                  className="text-slate-400 hover:text-green-500 h-6 w-6"
+                  title="Thumbs Up"
+                >
+                  <ThumbsUp className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => handleFeedback(msg.id, false)}
+                  className="text-slate-400 hover:text-red-500 h-6 w-6"
+                  title="Thumbs Down"
+                >
+                  <ThumbsDown className="h-4 w-4" />
+                </Button>
               </div>
             </div>
-          </>
+          </div>
         )}
 
         {msg.type === "user" && (
           <div className="flex items-start space-x-2 sm:space-x-3 max-w-[70%] sm:max-w-md">
             <div className="bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl rounded-tr-md p-3 sm:p-4 text-white text-xs sm:text-sm leading-relaxed">
-              {msg.content}
+              {editingMessageId === msg.id ? (
+                <Input
+                  value={editedMessage}
+                  onChange={(e) => setEditedMessage(e.target.value)}
+                  onKeyPress={handleKeyPress}
+                  className="bg-slate-800 border-slate-700 text-white"
+                />
+              ) : (
+                msg.content
+              )}
+              <div className="flex space-x-2 mt-2">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => handleCopyText(msg.content)}
+                  className="text-slate-400 hover:text-white h-6 w-6"
+                  title="Copy Message"
+                >
+                  <Copy className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => handleEditMessage(msg.id, msg.content)}
+                  className="text-slate-400 hover:text-white h-6 w-6"
+                  title={editingMessageId === msg.id ? "Save Edit" : "Edit Message"}
+                >
+                  <Edit className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
             <Avatar className="w-6 h-6 sm:w-8 sm:h-8 mt-1 flex-shrink-0">
               <AvatarImage src={userProfile?.photoURL || user?.photoURL || ""} />
@@ -352,9 +551,6 @@ export default function ChatPage() {
               >
                 <Menu className="h-4 w-4 sm:h-5 sm:w-5" />
               </Button>
-              <div className="w-6 h-6 sm:w-8 sm:h-8 relative">
-                <Image src="/logo.png" alt="Medibot Logo" width={24} height={24} className="rounded-full sm:w-8 sm:h-8" />
-              </div>
               <div>
                 <h1 className="text-white font-semibold text-sm sm:text-base">Your Personalized Medibot</h1>
               </div>
@@ -470,14 +666,7 @@ export default function ChatPage() {
 
               {loading && user && (
                 <div className="flex items-start space-x-2 sm:space-x-4">
-                  <Avatar className="w-8 h-8 sm:w-10 sm:h-10 mt-1">
-                    <AvatarImage src="/logo.png" alt="Medibot" />
-                    <AvatarFallback className="bg-purple-600 text-white text-xs sm:text-sm font-semibold">
-                      <Image src="/logo.png" alt="M" width={20} height={20} className="rounded-full" />
-                    </AvatarFallback>
-                  </Avatar>
                   <div className="flex-1">
-                    <p className="text-white font-medium text-xs sm:text-sm mb-1 sm:mb-2">Medibot</p>
                     <div className="bg-slate-800 rounded-xl rounded-tl-md p-3 sm:p-4 border border-slate-700">
                       <div className="flex space-x-1">
                         <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce"></div>
@@ -503,12 +692,38 @@ export default function ChatPage() {
             <div className="p-3 sm:p-4 md:p-6 border-t border-slate-800 bg-slate-900 sticky bottom-0">
               <div className="max-w-full sm:max-w-3xl md:max-w-4xl mx-auto">
                 <div className="flex items-center space-x-2 sm:space-x-3">
+                  <Button
+                    onClick={handleFileUpload}
+                    variant="ghost"
+                    size="icon"
+                    className="text-slate-400 hover:text-white hover:bg-slate-800 transition-colors h-10 w-10 sm:h-11 sm:w-11 md:h-12 md:w-12"
+                    title="Upload Image"
+                  >
+                    <Upload className="h-4 w-4 sm:h-5 sm:w-5" />
+                  </Button>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFileChange}
+                    className="hidden"
+                  />
+                  <Select value={selectedModel} onValueChange={setSelectedModel}>
+                    <SelectTrigger className="w-[140px] sm:w-[160px] bg-slate-800 border-slate-700 text-white text-xs sm:text-sm h-10 sm:h-11 md:h-12">
+                      <SelectValue placeholder="Select AI Model" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-slate-800 border-slate-700 text-white">
+                      <SelectItem value="gemini-1.5-flash-latest">Gemini 1.5 Flash</SelectItem>
+                      <SelectItem value="gemini-1.5-pro-latest">Gemini 1.5 Pro</SelectItem>
+                      <SelectItem value="grok">Grok (Beta)</SelectItem>
+                    </SelectContent>
+                  </Select>
                   <div className="flex-1 relative">
                     <Input
                       value={message}
                       onChange={(e) => setMessage(e.target.value)}
                       onKeyPress={handleKeyPress}
-                      placeholder="Ask a health question..."
+                      placeholder="Ask a health question or upload an image..."
                       className="bg-slate-800 border-slate-700 text-white placeholder-slate-400 h-10 sm:h-11 md:h-12 rounded-xl pr-10 sm:pr-12 text-xs sm:text-sm md:text-base"
                       disabled={loading}
                       maxLength={1000}
@@ -516,7 +731,7 @@ export default function ChatPage() {
                   </div>
                   <Button
                     onClick={handleSendMessage}
-                    disabled={loading || !message.trim()}
+                    disabled={loading || (!message.trim() && !fileInputRef.current?.files?.length)}
                     size="icon"
                     className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white rounded-full h-10 w-10 sm:h-11 sm:w-11 md:h-12 md:w-12 shadow-lg disabled:opacity-50"
                   >
@@ -747,3 +962,4 @@ export default function ChatPage() {
     </AuthGuard>
   )
 }
+
