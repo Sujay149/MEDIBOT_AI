@@ -306,7 +306,7 @@ export default function ChatPage() {
                 <Menu className="h-4 w-4 sm:h-5 sm:w-5" />
               </Button>
               <div className="w-6 h-6 sm:w-8 sm:h-8 relative">
-                <Image src="/logo.png" alt="MedBot Logo" width={24} height={24} className="rounded-full sm:w-8 sm:h-8" />
+                <Image src="/logo.png" alt="Medibot Logo" width={24} height={24} className="rounded-full sm:w-8 sm:h-8" />
               </div>
               <div>
                 <h1 className="text-purple-400 font-semibold text-sm sm:text-base">Chat with</h1>

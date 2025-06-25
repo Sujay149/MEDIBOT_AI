@@ -352,7 +352,7 @@ export default function MedicationsPage() {
                 <Menu className="h-5 w-5" />
               </Button>
               <div className="w-8 h-8 relative">
-                <Image src="/logo.png" alt="MedBot Logo" width={32} height={32} className="rounded-full" />
+                <Image src="/logo.png" alt="Medibot Logo" width={32} height={32} className="rounded-full" />
               </div>
               <span className="text-purple-400 font-semibold text-lg">My Medications</span>
             </div>

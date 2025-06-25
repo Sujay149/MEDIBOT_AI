@@ -54,9 +54,9 @@ export function Sidebar({ isOpen = true, onClose }: SidebarProps) {
           <div className="flex items-center justify-between mb-8">
             <div className="flex items-center space-x-3">
               <div className="w-8 h-8 relative">
-                <Image src="/logo.png" alt="MedBot Logo" width={32} height={32} className="rounded-full" />
+                <Image src="/logo.png" alt="Medibot Logo" width={32} height={32} className="rounded-full" />
               </div>
-              <span className="text-purple-400 font-semibold text-lg">MedBot</span>
+              <span className="text-purple-400 font-semibold text-lg">Medibot</span>
             </div>
             <div className="flex items-center space-x-2">
               <Button variant="ghost" size="icon" className="text-slate-400 hover:text-white hover:bg-slate-800">

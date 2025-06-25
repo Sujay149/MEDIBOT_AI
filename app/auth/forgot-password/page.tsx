@@ -49,9 +49,9 @@ export default function ForgotPasswordPage() {
         <div className="text-center mb-8">
           <div className="flex items-center justify-center space-x-3 mb-6">
             <div className="w-16 h-16 relative">
-              <Image src="/logo.png" alt="MedBot Logo" width={64} height={64} className="rounded-full" />
+              <Image src="/logo.png" alt="Medibot Logo" width={64} height={64} className="rounded-full" />
             </div>
-            <span className="text-purple-400 font-semibold text-2xl">MedBot</span>
+            <span className="text-purple-400 font-semibold text-2xl">Medibot</span>
           </div>
 
           <h1 className="text-3xl font-bold text-white mb-3">Reset Password</h1>

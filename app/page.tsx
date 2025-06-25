@@ -8,7 +8,7 @@ export default function HomePage() {
       <div className="w-full max-w-md text-center space-y-8">
         <div className="flex flex-col items-center space-y-6">
           <div className="w-20 h-20 relative">
-            <Image src="/logo.png" alt="MedBot Logo" width={80} height={80} className="rounded-full" />
+            <Image src="/logo.png" alt="Medibot Logo" width={80} height={80} className="rounded-full" />
           </div>
           <div>
             <h1 className="text-3xl font-bold text-white mb-3">Welcome to Medibot</h1>

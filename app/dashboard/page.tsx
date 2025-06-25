@@ -137,7 +137,7 @@ export default function DashboardPage() {
               <div className="w-8 h-8 bg-gradient-to-r from-purple-600 to-blue-600 rounded-full flex items-center justify-center">
                 <span className="text-white text-sm font-bold">M</span>
               </div>
-              <span className="text-purple-400 font-semibold">MedBot Dashboard</span>
+              <span className="text-purple-400 font-semibold">Medibot Dashboard</span>
             </div>
           </div>
 

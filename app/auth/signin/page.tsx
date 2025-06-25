@@ -80,13 +80,13 @@ export default function SignInPage() {
           <div className="text-center mb-6 sm:mb-8">
             <div className="flex items-center justify-center space-x-3 mb-4 sm:mb-6">
               <div className="w-12 h-12 sm:w-16 sm:h-16 relative">
-                <Image src="/logo.png" alt="MedBot Logo" width={64} height={64} className="rounded-full" />
+                <Image src="/logo.png" alt="Medibot Logo" width={64} height={64} className="rounded-full" />
               </div>
-              <span className="text-purple-400 font-semibold text-xl sm:text-2xl">MedBot</span>
+              <span className="text-purple-400 font-semibold text-xl sm:text-2xl">Medibot</span>
             </div>
 
             <h1 className="text-2xl sm:text-3xl font-bold text-white mb-2 sm:mb-3">Welcome Back</h1>
-            <p className="text-slate-400 text-sm sm:text-base">Sign in to continue to MedBot</p>
+            <p className="text-slate-400 text-sm sm:text-base">Sign in to continue to Medibot</p>
           </div>
 
           {/* Form */}

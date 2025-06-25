@@ -148,14 +148,14 @@ export default function ProfilePage() {
     const exportData = {
       profile: userProfile,
       exportDate: new Date().toISOString(),
-      note: "This is your MedBot data export",
+      note: "This is your Medibot data export",
     }
 
     const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" })
     const url = URL.createObjectURL(blob)
     const a = document.createElement("a")
     a.href = url
-    a.download = `medbot-data-export-${new Date().toISOString().split("T")[0]}.json`
+    a.download = `Medibot-data-export-${new Date().toISOString().split("T")[0]}.json`
     document.body.appendChild(a)
     a.click()
     document.body.removeChild(a)
