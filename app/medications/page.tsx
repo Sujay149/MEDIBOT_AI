@@ -404,7 +404,7 @@ export default function MedicationsPage() {
                         <SelectTrigger className="bg-slate-800 border-slate-700 text-white">
                           <SelectValue placeholder="Select frequency" />
                         </SelectTrigger>
-                        <SelectContent className="bg-slate-800 border-slate-700">
+<SelectContent className="bg-slate-900 border-2 border-purple-600 text-white shadow-lg">
                           <SelectItem value="once-daily">Once daily</SelectItem>
                           <SelectItem value="twice-daily">Twice daily</SelectItem>
                           <SelectItem value="three-times-daily">Three times daily</SelectItem>
@@ -467,10 +467,12 @@ export default function MedicationsPage() {
                       type="button"
                       variant="outline"
                       onClick={addReminderTime}
-                      className="mt-2 border-slate-700 text-slate-400 hover:text-white"
-                    >
+                      className="mt-2 border-slate-700 bg-slate-800 text-white "
+                    >                        
+
                       <Plus className="mr-2 h-4 w-4" />
                       Add Reminder Time
+
                     </Button>
                   </div>
 

@@ -351,7 +351,7 @@ export function AppointmentForm({ appointment, onSuccess, onCancel }: Appointmen
             <SelectTrigger className="bg-slate-800 border-slate-700 text-white mt-1">
               <SelectValue placeholder="Select appointment type" />
             </SelectTrigger>
-            <SelectContent className="bg-slate-800 border-slate-700">
+<SelectContent className="bg-slate-900 border-2 border-purple-600 text-white shadow-lg">
               <SelectItem value="consultation">General Consultation</SelectItem>
               <SelectItem value="checkup">Regular Checkup</SelectItem>
               <SelectItem value="follow-up">Follow-up Visit</SelectItem>
