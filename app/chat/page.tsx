@@ -1,4 +1,3 @@
-
 "use client"
 
 import type React from "react"
@@ -172,27 +171,41 @@ export default function ChatPage() {
   }
 
   const generateAIResponse = async (userMessage: string): Promise<string> => {
-    await new Promise((resolve) => setTimeout(resolve, 1000 + Math.random() * 2000))
-    const lowerMessage = userMessage.toLowerCase()
+    try {
+      const response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=AIzaSyDNHY0ptkqYXxknm1qJYP_tCw2A12be_gM", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [
+                {
+                  text: `You are Medibot, a health-focused AI assistant. Provide a concise, informative, and professional response to the following health-related user query. Ensure the response is educational, not a substitute for professional medical advice, and includes a reminder to consult a healthcare professional for personalized advice. Query: ${userMessage}`
+                }
+              ]
+            }
+          ],
+          generationConfig: {
+            temperature: 0.7,
+            maxOutputTokens: 200,
+          }
+        }),
+      })
 
-    if (lowerMessage.includes("headache") || lowerMessage.includes("migraine")) {
-      return "I understand you're experiencing headaches. 🧠 **Common headache types include:** tension headaches, migraines, and cluster headaches. **General management tips:** stay hydrated, maintain regular sleep, manage stress, and identify triggers. **When to seek help:** severe sudden headaches, headaches with fever, vision changes, or if they worsen over time. Please consult a healthcare professional for proper diagnosis and treatment."
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      const data = await response.json()
+      const botResponse = data.candidates[0].content.parts[0].text.trim()
+
+      return botResponse
+    } catch (error) {
+      console.error("Error calling Gemini API:", error)
+      return "I'm sorry, I couldn't process your request at this time. Please try again later or consult a healthcare professional for personalized advice."
     }
-
-    if (lowerMessage.includes("fever") || lowerMessage.includes("temperature") || lowerMessage.includes("hot")) {
-      return "Fever indicates your body is fighting an infection. 🌡️ **Normal body temperature:** 98.6°F (37°C). **Fever management:** rest, stay hydrated, use fever reducers as directed. **Seek immediate care if:** fever >103°F (39.4°C), persists for more than 3 days, or is accompanied by severe symptoms. Monitor symptoms closely."
-    }
-
-    if (lowerMessage.includes("medication") || lowerMessage.includes("medicine") || lowerMessage.includes("drug")) {
-      return "I can provide general medication information. 💊 **Important reminders:** take as prescribed, don't skip doses, be aware of side effects, check for drug interactions, store properly, and never share prescriptions. **Questions about medications?** Contact your pharmacist or healthcare provider. They can provide specific guidance about your medications, dosing, and potential interactions."
-    }
-
-    const responses = [
-      "Thank you for your health question! 🏥 While I can provide general health information, I always recommend consulting with a healthcare professional for personalized medical advice. **I can help with:** general health education, wellness tips, symptom information, and guidance on when to seek care. What specific health topic would you like to learn about?",
-      "I'm here to help with health information! 📋 **Remember:** this information is educational and not a substitute for professional medical advice. For specific health concerns, symptoms, or treatment decisions, please consult with your healthcare provider. **I can assist with:** health education, wellness strategies, and general information about conditions and symptoms. How can I help you today?",
-    ]
-
-    return responses[Math.floor(Math.random() * responses.length)]
   }
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
