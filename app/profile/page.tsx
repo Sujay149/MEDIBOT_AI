@@ -496,16 +496,7 @@ export default function ProfilePage() {
                       onCheckedChange={(checked) => handlePreferenceChange("shareDataForResearch", checked)}
                     />
                   </div>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-white font-medium">Analytics</p>
-                      <p className="text-slate-400 text-sm">Allow app usage analytics to improve user experience</p>
-                    </div>
-                    <Switch
-                      checked={formData.preferences.analytics}
-                      onCheckedChange={(checked) => handlePreferenceChange("analytics", checked)}
-                    />
-                  </div>
+                 
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-white font-medium">Save Conversations</p>
