@@ -1,90 +1,90 @@
-"use client"
+"use client";
 
-import type React from "react"
-import { useState, useEffect, useRef } from "react"
-import Image from "next/image"
-import { Sidebar } from "@/components/sidebar"
-import { AuthGuard } from "@/components/auth-guard"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Menu, Camera, RotateCcw, Plus, Send, Upload, X, FileText, Pill, AlertCircle, Copy, ThumbsUp, ThumbsDown, Edit } from "lucide-react"
-import { useAuth } from "@/hooks/useAuth"
+import type React from "react";
+import { useState, useEffect, useRef } from "react";
+import Image from "next/image";
+import { Sidebar } from "@/components/sidebar";
+import { AuthGuard } from "@/components/auth-guard";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Menu, Camera, RotateCcw, Plus, Send, Upload, X, FileText, Pill, AlertCircle, Copy, ThumbsUp, ThumbsDown, Edit } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
 import {
   createChatSession,
   addMessageToSession,
   subscribeToUserChatSessions,
   type ChatSession,
-} from "@/lib/firestore"
-import { toast } from "sonner"
-import Link from "next/link"
+} from "@/lib/firestore";
+import { toast } from "sonner";
+import Link from "next/link";
 
 interface PrescriptionAnalysis {
-  medications: string[]
-  dosages: string[]
-  instructions: string
-  warnings: string[]
-  userId?: string
-  fileName?: string
-  createdAt?: Date
+  medications: string[];
+  dosages: string[];
+  instructions: string;
+  warnings: string[];
+  userId?: string;
+  fileName?: string;
+  createdAt?: Date;
 }
 
 export default function ChatPage() {
-  const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [message, setMessage] = useState("")
-  const [currentSession, setCurrentSession] = useState<ChatSession | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [sessions, setSessions] = useState<ChatSession[]>([])
-  const [prescriptionDialogOpen, setPrescriptionDialogOpen] = useState(false)
-  const [historyDialogOpen, setHistoryDialogOpen] = useState(false)
-  const [analysisResult, setAnalysisResult] = useState<PrescriptionAnalysis | null>(null)
-  const [analyzingPrescription, setAnalyzingPrescription] = useState(false)
-  const [editingMessageId, setEditingMessageId] = useState<string | null>(null)
-  const [editedMessage, setEditedMessage] = useState("")
-  const [selectedModel, setSelectedModel] = useState("gemini-1.5-flash-latest")
-  const [selectedFile, setSelectedFile] = useState<File | null>(null)
-  const [fileName, setFileName] = useState<string>("")
-  const { user, userProfile } = useAuth()
-  const messagesEndRef = useRef<HTMLDivElement>(null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [message, setMessage] = useState("");
+  const [currentSession, setCurrentSession] = useState<ChatSession | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [sessions, setSessions] = useState<ChatSession[]>([]);
+  const [prescriptionDialogOpen, setPrescriptionDialogOpen] = useState(false);
+  const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
+  const [analysisResult, setAnalysisResult] = useState<PrescriptionAnalysis | null>(null);
+  const [analyzingPrescription, setAnalyzingPrescription] = useState(false);
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  const [editedMessage, setEditedMessage] = useState("");
+  const [selectedModel, setSelectedModel] = useState("gemini-1.5-flash-latest");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [fileName, setFileName] = useState<string>("");
+  const { user, userProfile } = useAuth();
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (!user) return
+    if (!user) return;
 
     const unsubscribe = subscribeToUserChatSessions(user.uid, (userSessions) => {
       const normalizedSessions = userSessions.map((session) => ({
         ...session,
         messages: session.messages ?? [],
-      }))
-      setSessions(normalizedSessions)
+      }));
+      setSessions(normalizedSessions);
       if (!currentSession && normalizedSessions.length > 0) {
-        setCurrentSession(normalizedSessions[0])
+        setCurrentSession(normalizedSessions[0]);
       }
-    })
+    });
 
-    return () => unsubscribe()
-  }, [user, currentSession])
+    return () => unsubscribe();
+  }, [user, currentSession]);
 
   useEffect(() => {
-    scrollToBottom()
-  }, [currentSession?.messages])
+    scrollToBottom();
+  }, [currentSession?.messages]);
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-  }
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
 
   const startNewChat = async () => {
     if (!user) {
-      toast.error("Please log in to start a new chat")
-      return
+      toast.error("Please log in to start a new chat");
+      return;
     }
 
     try {
-      const sessionId = await createChatSession(user.uid, "New Chat")
+      const sessionId = await createChatSession(user.uid, "New Chat");
       const newSession: ChatSession = {
         id: sessionId,
         userId: user.uid,
@@ -92,37 +92,37 @@ export default function ChatPage() {
         messages: [],
         createdAt: new Date(),
         updatedAt: new Date(),
-      }
+      };
 
-      setCurrentSession(newSession)
-      toast.success("New chat started!")
+      setCurrentSession(newSession);
+      toast.success("New chat started!");
     } catch (error) {
-      console.error("Error starting new chat:", error)
-      toast.error("Failed to start new chat")
+      console.error("Error starting new chat:", error);
+      toast.error("Failed to start new chat");
     }
-  }
+  };
 
   const handleSendMessage = async () => {
     if (!user) {
-      toast.error("Please log in to send messages")
-      return
+      toast.error("Please log in to send messages");
+      return;
     }
 
-    if (!message.trim() && !selectedFile) return
+    if (!message.trim() && !selectedFile) return;
 
-    const userMessage = message.trim() || "Image uploaded"
-    setMessage("")
-    setSelectedFile(null)
-    setFileName("")
-    if (fileInputRef.current) fileInputRef.current.value = ""
-    setLoading(true)
+    const userMessage = message.trim() || "Image uploaded";
+    setMessage("");
+    setSelectedFile(null);
+    setFileName("");
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    setLoading(true);
 
     try {
-      let sessionToUse = currentSession
+      let sessionToUse = currentSession;
 
       if (!sessionToUse) {
-        const smartTitle = message.trim() ? generateChatTitle(message) : "Image Analysis"
-        const sessionId = await createChatSession(user.uid, smartTitle)
+        const smartTitle = message.trim() ? generateChatTitle(message) : "Image Analysis";
+        const sessionId = await createChatSession(user.uid, smartTitle);
         sessionToUse = {
           id: sessionId,
           userId: user.uid,
@@ -130,112 +130,113 @@ export default function ChatPage() {
           messages: [],
           createdAt: new Date(),
           updatedAt: new Date(),
-        }
-        setCurrentSession(sessionToUse)
+        };
+        setCurrentSession(sessionToUse);
       }
 
-      let botResponse = ""
+      let botResponse = "";
       if (message.trim()) {
-        botResponse = await generateAIResponse(message)
+        botResponse = await generateAIResponse(message);
       }
       if (selectedFile) {
-        const analysis = await analyzePrescription(selectedFile)
-        const analysisText = `**Prescription Analysis**:\n- **Medications**: ${analysis.medications.join(", ")}\n- **Dosages**: ${analysis.dosages.join(", ")}\n- **Instructions**: ${analysis.instructions}${analysis.warnings.length ? "\n- **Warnings**: " + analysis.warnings.join(", ") : ""}`
-        botResponse = botResponse ? `${botResponse}\n\n${analysisText}` : analysisText
+        const analysis = await analyzePrescription(selectedFile);
+        const analysisText = `**Prescription Analysis**:\n- **Medications**: ${analysis.medications.join(", ")}\n- **Dosages**: ${analysis.dosages.join(", ")}\n- **Instructions**: ${analysis.instructions}${analysis.warnings.length ? "\n- **Warnings**: " + analysis.warnings.join(", ") : ""}`;
+        botResponse = botResponse ? `${botResponse}\n\n${analysisText}` : analysisText;
       }
 
       if (sessionToUse.id) {
-        const newMessage = await addMessageToSession(sessionToUse.id, user.uid, userMessage, botResponse, "chat")
+        const newMessage = await addMessageToSession(sessionToUse.id, user.uid, userMessage, botResponse, "chat");
 
         setCurrentSession((prev) => {
-          if (!prev) return prev
+          if (!prev) return prev;
           return {
             ...prev,
             messages: [...(prev.messages ?? []), newMessage],
             updatedAt: new Date(),
-          }
-        })
+          };
+        });
 
-        sendMessageNotification(userMessage, botResponse)
-        toast.success("Message sent!")
+        sendMessageNotification(userMessage, botResponse);
+        toast.success("Message sent!");
       }
     } catch (error) {
-      console.error("Error sending message:", error)
-      toast.error("Failed to send message. Please try again.")
-      setMessage(message)
+      console.error("Error sending message:", error);
+      toast.error("Failed to send message. Please try again.");
+      setMessage(message);
       if (selectedFile) {
-        setSelectedFile(selectedFile)
-        setFileName(selectedFile.name)
+        setSelectedFile(selectedFile);
+        setFileName(selectedFile.name);
       }
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   const handleEditMessage = async (messageId: string, originalMessage: string) => {
     if (!user) {
-      toast.error("Please log in to edit messages")
-      return
+      toast.error("Please log in to edit messages");
+      return;
     }
 
     if (editingMessageId === messageId) {
       if (!editedMessage.trim()) {
-        toast.error("Message cannot be empty")
-        return
+        toast.error("Message cannot be empty");
+        return;
       }
 
       try {
-        setLoading(true)
-        const botResponse = await generateAIResponse(editedMessage)
-        const sessionId = currentSession?.id
+        setLoading(true);
+        const botResponse = await generateAIResponse(editedMessage);
+        const sessionId = currentSession?.id;
         if (sessionId) {
           const updatedMessages = (currentSession?.messages ?? []).map((msg, index) =>
             `user-${index}` === messageId ? { ...msg, message: editedMessage, response: botResponse } : msg
-          )
-          await addMessageToSession(sessionId, user.uid, editedMessage, botResponse, "chat")
-          setCurrentSession((prev) => (prev ? { ...prev, messages: updatedMessages } : prev))
-          toast.success("Message updated!")
+          );
+          await addMessageToSession(sessionId, user.uid, editedMessage, botResponse, "chat");
+          setCurrentSession((prev) => (prev ? { ...prev, messages: updatedMessages } : prev));
+          toast.success("Message updated!");
         }
       } catch (error) {
-        console.error("Error editing message:", error)
-        toast.error("Failed to edit message")
+        console.error("Error editing message:", error);
+        toast.error("Failed to edit message");
       } finally {
-        setEditingMessageId(null)
-        setEditedMessage("")
-        setLoading(false)
+        setEditingMessageId(null);
+        setEditedMessage("");
+        setLoading(false);
       }
     } else {
-      setEditingMessageId(messageId)
-      setEditedMessage(originalMessage)
+      setEditingMessageId(messageId);
+      setEditedMessage(originalMessage);
     }
-  }
+  };
 
   const handleCopyText = (text: string) => {
-    navigator.clipboard.writeText(text)
-    toast.success("Copied to clipboard!")
-  }
+    navigator.clipboard.writeText(text);
+    toast.success("Copied to clipboard!");
+  };
 
   const handleFeedback = (messageId: string, isPositive: boolean) => {
-    toast.success(isPositive ? "Thanks for the thumbs up!" : "Thanks for the feedback!")
+    toast.success(isPositive ? "Thanks for the thumbs up!" : "Thanks for the feedback!");
     // Future: Log feedback to Firestore or analytics
-  }
+  };
 
   const generateChatTitle = (firstMessage: string): string => {
-    const lowerMessage = firstMessage.toLowerCase()
-    if (lowerMessage.includes("headache") || lowerMessage.includes("migraine")) return "Headache Consultation"
-    if (lowerMessage.includes("fever") || lowerMessage.includes("temperature")) return "Fever Assessment"
-    if (lowerMessage.includes("medication") || lowerMessage.includes("medicine")) return "Medication Inquiry"
-    if (lowerMessage.includes("diet") || lowerMessage.includes("nutrition")) return "Nutrition Guidance"
-    if (lowerMessage.includes("exercise") || lowerMessage.includes("workout")) return "Exercise Consultation"
-    if (lowerMessage.includes("sleep") || lowerMessage.includes("insomnia")) return "Sleep Health"
-    if (lowerMessage.includes("stress") || lowerMessage.includes("anxiety")) return "Mental Health Support"
-    if (lowerMessage.includes("pain")) return "Pain Management"
+    const lowerMessage = firstMessage.toLowerCase();
+    if (lowerMessage.includes("headache") || lowerMessage.includes("migraine")) return "Headache Consultation";
+    if (lowerMessage.includes("fever") || lowerMessage.includes("temperature")) return "Fever Assessment";
+    if (lowerMessage.includes("medication") || lowerMessage.includes("medicine")) return "Medication Inquiry";
+    if (lowerMessage.includes("diet") || lowerMessage.includes("nutrition")) return "Nutrition Guidance";
+    if (lowerMessage.includes("exercise") || lowerMessage.includes("workout")) return "Exercise Consultation";
+    if (lowerMessage.includes("sleep") || lowerMessage.includes("insomnia")) return "Sleep Health";
+ 
+    if (lowerMessage.includes("stress") || lowerMessage.includes("anxiety")) return "Mental Health Support";
+    if (lowerMessage.includes("pain")) return "Pain Management";
 
-    const words = firstMessage.split(" ").filter((word) => word.length > 3)
-    if (words.length > 0) return `${words[0].charAt(0).toUpperCase() + words[0].slice(1)} Discussion`
+    const words = firstMessage.split(" ").filter((word) => word.length > 3);
+    if (words.length > 0) return `${words[0].charAt(0).toUpperCase() + words[0].slice(1)} Discussion`;
 
-    return "Health Consultation"
-  }
+    return "Health Consultation";
+  };
 
   const sendMessageNotification = (userMessage: string, botResponse: string) => {
     if ("Notification" in window && Notification.permission === "granted") {
@@ -243,16 +244,16 @@ export default function ChatPage() {
         body: "Your health question has been answered",
         icon: "/logo.png",
         badge: "/logo.png",
-      })
+      });
     }
-  }
+  };
 
   const generateAIResponse = async (userMessage: string): Promise<string> => {
     try {
-      const endpoint = selectedModel === "grok" 
+      const endpoint = selectedModel === "grok"
         ? "https://api.x.ai/v1/models/grok:generateContent" // Dummy Grok API
-        : `https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:generateContent`
-      
+        : `https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:generateContent`;
+
       const response = await fetch(
         `${endpoint}?key=${process.env.NEXT_PUBLIC_GEMINI_API_KEY}`,
         {
@@ -265,38 +266,38 @@ export default function ChatPage() {
               {
                 parts: [
                   {
-                    text: `You are Medibot, a health-focused AI assistant. Provide a concise, informative, and professional response to the following health-related user query. Ensure the response is educational, not a substitute for professional medical advice, and includes a reminder to consult a healthcare professional for personalized advice. Query: ${userMessage}`
-                  }
-                ]
-              }
+                    text: `You are Medibot, a health-focused AI assistant. Provide a concise, informative, and professional response to the following health-related user query. Ensure the response is educational, not a substitute for professional medical advice, and includes a reminder to consult a healthcare professional for personalized advice. Query: ${userMessage}`,
+                  },
+                ],
+              },
             ],
             generationConfig: {
               temperature: 0.7,
               maxOutputTokens: 200,
-            }
-          }),
+            },
+          })
         }
-      )
+      );
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      const data = await response.json()
-      const botResponse = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "No response generated."
+      const data = await response.json();
+      const botResponse = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "No response generated.";
 
-      return botResponse
+      return botResponse;
     } catch (error) {
-      console.error("Error calling AI API:", error)
-      return "I'm sorry, I couldn't process your request at this time. Please try again later or consult a healthcare professional for personalized advice."
+      console.error("Error calling AI API:", error);
+      return "I'm sorry, I couldn't process your request at this time. Please try again later or consult a healthcare professional for personalized advice";
     }
-  }
+  };
 
   const analyzePrescription = async (file: File): Promise<PrescriptionAnalysis> => {
     try {
       const endpoint = selectedModel === "grok"
         ? "https://api.x.ai/v1/models/grok:analyzePrescription" // Dummy Grok API
-        : `https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:generateContent`
+        : `https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:generateContent`;
 
       const response = await fetch(
         `${endpoint}?key=${process.env.NEXT_PUBLIC_GEMINI_API_KEY}`,
@@ -307,45 +308,45 @@ export default function ChatPage() {
               {
                 parts: [
                   {
-                    text: `Analyze this prescription image and extract medications, dosages, instructions, and any warnings. Return the response in JSON format with fields: medications (array), dosages (array), instructions (string), warnings (array).`
+                    text: `Analyze this prescription image and extract medications, dosages, instructions, and any warnings. Return the response in JSON format with fields: medications (array), dosages (array), instructions (string), warnings (array).`,
                   },
                   {
                     inlineData: {
                       mimeType: file.type,
-                      data: await fileToBase64(file)
-                    }
-                  }
-                ]
-              }
+                      data: await fileToBase64(file),
+                    },
+                  },
+                ],
+              },
             ],
             generationConfig: {
               temperature: 0.5,
               maxOutputTokens: 500,
-            }
-          }),
+            },
+          })
         }
-      )
+      );
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      const data = await response.json()
-      let responseText = data.candidates?.[0]?.content?.parts?.[0]?.text || "{}"
-      
+      const data = await response.json();
+      let responseText = data.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
+
       // Clean response text by removing markdown code fences and backticks
       responseText = responseText
         .replace(/```json/g, "")
         .replace(/```/g, "")
         .replace(/`/g, "")
-        .trim()
+        .trim();
 
-      let result
+      let result;
       try {
-        result = JSON.parse(responseText)
+        result = JSON.parse(responseText);
       } catch (parseError) {
-        console.error("JSON parse error:", parseError)
-        throw new Error("Invalid JSON response")
+        console.error("JSON parse error:", parseError);
+        throw new Error("Invalid JSON response");
       }
 
       return {
@@ -353,96 +354,96 @@ export default function ChatPage() {
         dosages: result.dosages || ["Unknown"],
         instructions: result.instructions || "No instructions provided.",
         warnings: result.warnings || [],
-      }
+      };
     } catch (error) {
-      console.error("Error analyzing prescription:", error)
+      console.error("Error analyzing prescription:", error);
       return {
         medications: ["Error"],
         dosages: ["N/A"],
         instructions: "Failed to analyze prescription.",
-        warnings: ["Please try again or consult a healthcare professional."],
-      }
+        warnings: ["Pleaseooooooooo try again or consult a healthcare professional."],
+      };
     }
-  }
+  };
 
   const fileToBase64 = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
-      const reader = new FileReader()
+      const reader = new FileReader();
       reader.onload = () => {
-        const base64String = (reader.result as string).split(",")[1]
-        resolve(base64String)
-      }
-      reader.onerror = () => reject(new Error("Failed to read file"))
-      reader.readAsDataURL(file)
-    })
-  }
+        const base64String = (reader.result as string).split(",")[1];
+        resolve(base64String);
+      };
+      reader.onerror = () => reject(new Error("Failed to read file"));
+      reader.readAsDataURL(file);
+    });
+  };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (!user) {
-      toast.error("Please log in to send messages")
-      return
+      toast.error("Please log in to send messages");
+      return;
     }
     if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault()
+      e.preventDefault();
       if (editingMessageId) {
-        handleEditMessage(editingMessageId, editedMessage)
+        handleEditMessage(editingMessageId, editedMessage);
       } else {
-        handleSendMessage()
+        handleSendMessage();
       }
     }
-  }
+  };
 
   const handlePrescriptionAnalysis = () => {
     if (!user) {
-      toast.error("Please log in to analyze prescriptions")
-      return
+      toast.error("Please log in to analyze prescriptions");
+      return;
     }
-    setPrescriptionDialogOpen(true)
-    setAnalysisResult(null)
-  }
+    setPrescriptionDialogOpen(true);
+    setAnalysisResult(null);
+  };
 
   const handleFileUpload = () => {
     if (!user) {
-      toast.error("Please log in to upload files")
-      return
+      toast.error("Please log in to upload files");
+      return;
     }
-    fileInputRef.current?.click()
-  }
+    fileInputRef.current?.click();
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!user) {
-      toast.error("Please log in to upload files")
-      return
+      toast.error("Please log in to upload files");
+      return;
     }
 
-    const file = e.target.files?.[0]
-    if (!file) return
+    const file = e.target.files?.[0];
+    if (!file) return;
 
-    setSelectedFile(file)
-    setFileName(file.name)
-  }
+        setSelectedFile(file);
+    setFileName(file.name);
+  };
 
   const removeFile = () => {
-    setSelectedFile(null)
-    setFileName("")
-    if (fileInputRef.current) fileInputRef.current.value = ""
-  }
+    setSelectedFile(null);
+    setFileName("");
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
 
   const handleHistoryDialog = () => {
     if (!user) {
-      toast.error("Please log in to view chat history")
-      return
+      toast.error("Please log in to view chat history");
+      return;
     }
-    setHistoryDialogOpen(true)
-  }
+    setHistoryDialogOpen(true);
+  };
 
   const renderMessages = () => {
-    if (!user) return null
+    if (!user) return null;
     if (!currentSession?.messages || currentSession.messages.length === 0) {
-      return null
+      return null;
     }
 
-    const allMessages: Array<{ type: "user" | "bot"; content: string; timestamp?: any; id: string }> = []
+    const allMessages: Array<{ type: "user" | "bot"; content: string; timestamp?: any; id: string }> = [];
 
     currentSession.messages.forEach((msg, index) => {
       allMessages.push({
@@ -450,7 +451,7 @@ export default function ChatPage() {
         content: msg.message,
         timestamp: msg.timestamp,
         id: `user-${index}`,
-      })
+      });
 
       if (msg.response) {
         allMessages.push({
@@ -458,9 +459,9 @@ export default function ChatPage() {
           content: msg.response,
           timestamp: msg.timestamp,
           id: `bot-${index}`,
-        })
+        });
       }
-    })
+    });
 
     return allMessages.map((msg) => (
       <div
@@ -469,7 +470,7 @@ export default function ChatPage() {
       >
         {msg.type === "bot" && (
           <div className="flex-1 max-w-[80%] sm:max-w-3xl">
-            <div className="bg-slate-800 rounded-xl rounded-tl-md p-3 sm:p-4 text-slate-300 text-xs sm:text-sm leading-relaxed border border-slate-700 whitespace-pre-wrap">
+            <div className="bg-muted rounded-xl rounded-tl-md p-3 sm:p-4 text-foreground text-xs sm:text-sm leading-relaxed border border-border whitespace-pre-wrap">
               {msg.content.split("\n").map((line, index) => (
                 <p key={index} className={line.startsWith("**") ? "font-semibold" : ""}>
                   {line}
@@ -480,7 +481,7 @@ export default function ChatPage() {
                   variant="ghost"
                   size="icon"
                   onClick={() => handleCopyText(msg.content)}
-                  className="text-slate-400 hover:text-white h-6 w-6"
+                  className="text-muted-foreground hover:text-foreground h-6 w-6"
                   title="Copy Response"
                 >
                   <Copy className="h-4 w-4" />
@@ -489,7 +490,7 @@ export default function ChatPage() {
                   variant="ghost"
                   size="icon"
                   onClick={() => handleFeedback(msg.id, true)}
-                  className="text-slate-400 hover:text-green-500 h-6 w-6"
+                  className="text-muted-foreground hover:text-green-500 h-6 w-6"
                   title="Thumbs Up"
                 >
                   <ThumbsUp className="h-4 w-4" />
@@ -498,8 +499,9 @@ export default function ChatPage() {
                   variant="ghost"
                   size="icon"
                   onClick={() => handleFeedback(msg.id, false)}
-                  className="text-slate-400 hover:text-red-500 h-6 w-6"
+                  className="text-muted-foreground hover:text-red-500 h-6 w-6"
                   title="Thumbs Down"
+ aria-label="Thumbs Down"
                 >
                   <ThumbsDown className="h-4 w-4" />
                 </Button>
@@ -510,13 +512,13 @@ export default function ChatPage() {
 
         {msg.type === "user" && (
           <div className="flex items-start space-x-2 sm:space-x-3 max-w-[70%] sm:max-w-md">
-            <div className="bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl rounded-tr-md p-3 sm:p-4 text-white text-xs sm:text-sm leading-relaxed">
+            <div className="bg-purple-600 rounded-xl rounded-tr-md p-3 sm:p-4 text-white text-xs sm:text-sm leading-relaxed">
               {editingMessageId === msg.id ? (
                 <Input
                   value={editedMessage}
                   onChange={(e) => setEditedMessage(e.target.value)}
                   onKeyPress={handleKeyPress}
-                  className="bg-slate-800 border-slate-700 text-white"
+                  className="bg-muted border-border text-foreground focus:outline-none focus:ring-2 focus:ring-purple-600"
                 />
               ) : (
                 msg.content
@@ -526,7 +528,7 @@ export default function ChatPage() {
                   variant="ghost"
                   size="icon"
                   onClick={() => handleCopyText(msg.content)}
-                  className="text-slate-400 hover:text-white h-6 w-6"
+                  className="text-white hover:text-gray-200 h-6 w-6"
                   title="Copy Message"
                 >
                   <Copy className="h-4 w-4" />
@@ -535,7 +537,7 @@ export default function ChatPage() {
                   variant="ghost"
                   size="icon"
                   onClick={() => handleEditMessage(msg.id, msg.content)}
-                  className="text-slate-400 hover:text-white h-6 w-6"
+                  className="text-white hover:text-gray-200 h-6 w-6"
                   title={editingMessageId === msg.id ? "Save Edit" : "Edit Message"}
                 >
                   <Edit className="h-4 w-4" />
@@ -544,7 +546,7 @@ export default function ChatPage() {
             </div>
             <Avatar className="w-6 h-6 sm:w-8 sm:h-8 mt-1 flex-shrink-0">
               <AvatarImage src={userProfile?.photoURL || user?.photoURL || ""} />
-              <AvatarFallback className="bg-slate-600 text-white text-xs sm:text-sm">
+              <AvatarFallback className="bg-purple-600 text-white text-xs sm:text-sm">
                 {userProfile?.displayName?.charAt(0).toUpperCase() ||
                   user?.displayName?.charAt(0).toUpperCase() ||
                   user?.email?.charAt(0).toUpperCase() ||
@@ -554,28 +556,28 @@ export default function ChatPage() {
           </div>
         )}
       </div>
-    ))
-  }
+    ));
+  };
 
   return (
     <AuthGuard>
-      <div className="flex h-screen bg-slate-950 overflow-hidden">
+      <div className="bg-background text-foreground min-h-screen flex h-screen overflow-hidden">
         <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
         <div className="flex-1 flex flex-col">
-          <div className="flex items-center justify-between p-3 sm:p-4 border-b border-slate-800 bg-slate-900">
+          {/* Header */}
+          <div className="flex items-center justify-between p-3 sm:p-4 border-b border-border bg-card">
             <div className="flex items-center space-x-2 sm:space-x-3">
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={() => setSidebarOpen(true)}
-                className="text-slate-400 hover:text-white lg:hidden"
+                className="text-muted-foreground hover:text-foreground lg:hidden h-10 w-10"
+                aria-label="Open sidebar"
               >
-                <Menu className="h-4 w-4 sm:h-5 sm:w-5" />
+                <Menu className="h-5 w-5" />
               </Button>
-              <div>
-                <h1 className="text-white font-semibold text-sm sm:text-base">Your Personalized Medibot</h1>
-              </div>
+              <h1 className="font-semibold text-lg">Your Personalized Medibot</h1>
             </div>
 
             <div className="flex items-center space-x-1 sm:space-x-2">
@@ -584,7 +586,7 @@ export default function ChatPage() {
                   <Link href="/auth/signin">
                     <Button
                       variant="outline"
-                      className="bg-slate-900 border-slate-700 text-white hover:bg-slate-800 text-xs sm:text-sm h-8 sm:h-10 px-2 sm:px-4"
+                      className="bg-muted border-border text-foreground hover:bg-purple-600 hover:text-white text-xs sm:text-sm h-8 sm:h-10 px-2 sm:px-4"
                     >
                       Login
                     </Button>
@@ -592,7 +594,7 @@ export default function ChatPage() {
                   <Link href="/auth/signup">
                     <Button
                       variant="outline"
-                      className="bg-slate-900 border-slate-700 text-white hover:bg-slate-800 text-xs sm:text-sm h-8 sm:h-10 px-2 sm:px-4"
+                      className="bg-muted border-border text-foreground hover:bg-purple-600 hover:text-white text-xs sm:text-sm h-8 sm:h-10 px-2 sm:px-4"
                     >
                       Signup
                     </Button>
@@ -604,8 +606,9 @@ export default function ChatPage() {
                     onClick={startNewChat}
                     variant="ghost"
                     size="icon"
-                    className="text-slate-400 hover:text-white hover:bg-slate-800 transition-colors h-8 w-8 sm:h-10 sm:w-10"
+                    className="text-muted-foreground hover:text-foreground hover:bg-muted h-8 w-8 sm:h-10 sm:w-10"
                     title="Start New Chat"
+                    aria-label="Start New Chat"
                   >
                     <Plus className="h-4 w-4 sm:h-5 sm:w-5" />
                   </Button>
@@ -613,8 +616,9 @@ export default function ChatPage() {
                     onClick={handlePrescriptionAnalysis}
                     variant="ghost"
                     size="icon"
-                    className="text-slate-400 hover:text-white hover:bg-slate-800 transition-colors h-8 w-8 sm:h-10 sm:w-10"
+                    className="text-muted-foreground hover:text-foreground hover:bg-muted h-8 w-8 sm:h-10 sm:w-10"
                     title="Prescription Analysis"
+                    aria-label="Prescription Analysis"
                   >
                     <Camera className="h-4 w-4 sm:h-5 sm:w-5" />
                   </Button>
@@ -622,8 +626,9 @@ export default function ChatPage() {
                     onClick={handleHistoryDialog}
                     variant="ghost"
                     size="icon"
-                    className="text-slate-400 hover:text-white hover:bg-slate-800 transition-colors h-8 w-8 sm:h-10 sm:w-10"
+                    className="text-muted-foreground hover:text-foreground hover:bg-muted h-8 w-8 sm:h-10 sm:w-10"
                     title="Chat History"
+                    aria-label="Chat History"
                   >
                     <RotateCcw className="h-4 w-4 sm:h-5 sm:w-5" />
                   </Button>
@@ -632,6 +637,7 @@ export default function ChatPage() {
             </div>
           </div>
 
+          {/* Chat Content */}
           <div className="flex-1 overflow-y-auto p-3 sm:p-4 md:p-6">
             <div className="max-w-full sm:max-w-3xl md:max-w-4xl mx-auto space-y-4 sm:space-y-6">
               {!user ? (
@@ -642,15 +648,15 @@ export default function ChatPage() {
                         <Image src="/logo.png" alt="Medibot Logo" width={80} height={80} className="rounded-full" />
                       </div>
                       <div>
-                        <h1 className="text-3xl font-bold text-white mb-3">Welcome to Medibot</h1>
-                        <p className="text-slate-400 text-sm">Please log in or sign up to start chatting.</p>
+                        <h1 className="text-3xl font-bold">Welcome to Medibot</h1>
+                        <p className="text-muted-foreground text-sm">Please log in or sign up to start chatting.</p>
                       </div>
                     </div>
                     <div className="space-y-4">
                       <Link href="/auth/signin" className="block">
                         <Button
                           variant="outline"
-                          className="w-full h-12 bg-slate-900 border-slate-700 text-white hover:bg-slate-800 rounded-xl"
+                          className="w-full h-12 bg-muted border-border text-foreground hover:bg-purple-600 hover:text-white rounded-xl"
                         >
                           Login
                         </Button>
@@ -658,7 +664,7 @@ export default function ChatPage() {
                       <Link href="/auth/signup" className="block">
                         <Button
                           variant="outline"
-                          className="w-full h-12 bg-slate-900 border-slate-700 text-white hover:bg-slate-800 rounded-xl"
+                          className="w-full h-12 bg-muted border-border text-foreground hover:bg-purple-600 hover:text-white rounded-xl"
                         >
                           Signup
                         </Button>
@@ -674,8 +680,8 @@ export default function ChatPage() {
                         <Image src="/logo.png" alt="Medibot Logo" width={80} height={80} className="rounded-full" />
                       </div>
                       <div>
-                        <h1 className="text-3xl font-bold text-white mb-3">Welcome to Medibot</h1>
-                        <p className="text-slate-400 text-sm">Start a conversation below.</p>
+                        <h1 className="text-3xl font-bold">Welcome to Medibot</h1>
+                        <p className="text-muted-foreground text-sm">Start a conversation below.</p>
                       </div>
                     </div>
                   </div>
@@ -689,15 +695,15 @@ export default function ChatPage() {
               {loading && user && (
                 <div className="flex items-start space-x-2 sm:space-x-4">
                   <div className="flex-1">
-                    <div className="bg-slate-800 rounded-xl rounded-tl-md p-3 sm:p-4 border border-slate-700">
+                    <div className="bg-muted rounded-xl rounded-tl-md p-3 sm:p-4 border border-border">
                       <div className="flex space-x-1">
-                        <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce"></div>
+                        <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce"></div>
                         <div
-                          className="w-2 h-2 bg-slate-400 rounded-full animate-bounce"
+                          className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce"
                           style={{ animationDelay: "0.1s" }}
                         ></div>
                         <div
-                          className="w-2 h-2 bg-slate-400 rounded-full animate-bounce"
+                          className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce"
                           style={{ animationDelay: "0.2s" }}
                         ></div>
                       </div>
@@ -710,8 +716,9 @@ export default function ChatPage() {
             </div>
           </div>
 
+          {/* Input Area */}
           {user && (
-            <div className="p-3 sm:p-4 md:p-6 border-t border-slate-800 bg-slate-900 sticky bottom-0">
+            <div className="p-3 sm:p-4 md:p-6 border-t border-border bg-card sticky bottom-0">
               <div className="max-w-full sm:max-w-3xl md:max-w-4xl mx-auto">
                 <div className="flex flex-col space-y-2">
                   <div className="flex items-center space-x-2 sm:space-x-3">
@@ -721,7 +728,7 @@ export default function ChatPage() {
                         onChange={(e) => setMessage(e.target.value)}
                         onKeyPress={handleKeyPress}
                         placeholder="Ask a health question or upload an image..."
-                        className="bg-slate-800 border-slate-700 text-white placeholder-slate-400 h-10 sm:h-11 md:h-12 rounded-xl pr-36 sm:pr-40 text-xs sm:text-sm md:text-base"
+                        className="bg-muted border-border text-foreground placeholder-muted-foreground h-10 sm:h-11 md:h-12 rounded-xl pr-36 sm:pr-40 text-xs sm:text-sm md:text-base focus:outline-none focus:ring-2 focus:ring-purple-600"
                         disabled={loading}
                         maxLength={1000}
                       />
@@ -730,8 +737,9 @@ export default function ChatPage() {
                           onClick={handleFileUpload}
                           variant="ghost"
                           size="icon"
-                          className="text-slate-400 hover:text-white hover:bg-slate-800 h-6 w-6 sm:h-7 sm:w-7"
+                          className="text-muted-foreground hover:text-foreground hover:bg-muted h-6 w-6 sm:h-7 sm:w-7"
                           title="Upload Image"
+                          aria-label="Upload Image"
                         >
                           <Upload className="h-4 w-4 sm:h-5 sm:w-5" />
                         </Button>
@@ -743,10 +751,10 @@ export default function ChatPage() {
                           className="hidden"
                         />
                         <Select value={selectedModel} onValueChange={setSelectedModel}>
-                          <SelectTrigger className="w-[100px] sm:w-[120px] bg-slate-800 border-none text-white text-xs h-6 sm:h-7 focus:ring-0">
+                          <SelectTrigger className="w-[100px] sm:w-[120px] bg-muted border-border text-foreground text-xs h-6 sm:h-7 focus:outline-none focus:ring-2 focus:ring-purple-600">
                             <SelectValue placeholder="Model" />
                           </SelectTrigger>
-                          <SelectContent className="bg-slate-800 border-slate-700 text-white text-xs">
+                          <SelectContent className="bg-card border-border text-foreground text-xs shadow-lg">
                             <SelectItem value="gemini-1.5-flash-latest">Gemini 1.5 Flash</SelectItem>
                             <SelectItem value="gemini-1.5-pro-latest">Gemini 1.5 Pro</SelectItem>
                             <SelectItem value="grok">Grok (Beta)</SelectItem>
@@ -758,7 +766,8 @@ export default function ChatPage() {
                       onClick={handleSendMessage}
                       disabled={loading || (!message.trim() && !selectedFile)}
                       size="icon"
-                      className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white rounded-full h-10 w-10 sm:h-11 sm:w-11 md:h-12 md:w-12 shadow-lg disabled:opacity-50"
+                      className="bg-purple-600 hover:bg-purple-700 text-white rounded-full h-10 w-10 sm:h-11 sm:w-11 md:h-12 md:w-12 shadow-lg disabled:opacity-50"
+                      aria-label="Send Message"
                     >
                       <Send className="h-4 w-4 sm:h-5 sm:w-5" />
                     </Button>
@@ -767,7 +776,7 @@ export default function ChatPage() {
                     <div className="flex items-center space-x-2">
                       <Badge
                         variant="secondary"
-                        className="bg-slate-700 text-slate-300 text-xs truncate max-w-[200px] sm:max-w-[300px]"
+                        className="bg-muted text-muted-foreground text-xs truncate max-w-[200px] sm:max-w-[300px]"
                       >
                         {fileName}
                       </Badge>
@@ -775,8 +784,9 @@ export default function ChatPage() {
                         onClick={removeFile}
                         variant="ghost"
                         size="icon"
-                        className="text-slate-400 hover:text-red-500 h-6 w-6"
+                        className="text-muted-foreground hover:text-red-500 h-6 w-6"
                         title="Remove File"
+                        aria-label="Remove File"
                       >
                         <X className="h-4 w-4" />
                       </Button>
@@ -791,33 +801,33 @@ export default function ChatPage() {
         {user && (
           <>
             <Dialog open={prescriptionDialogOpen} onOpenChange={setPrescriptionDialogOpen}>
-              <DialogContent className="bg-slate-900 border-slate-800 text-white max-w-[90vw] sm:max-w-2xl mx-auto max-h-[90vh] sm:max-h-[80vh] overflow-y-auto sm:rounded-lg p-4 sm:p-6">
+              <DialogContent className="bg-card border-border text-foreground max-w-[90vw] sm:max-w-2xl mx-auto max-h-[90vh] sm:max-h-[80vh] overflow-y-auto sm:rounded-xl p-4 sm:p-6 shadow">
                 <DialogHeader>
-                  <DialogTitle className="flex items-center space-x-2 text-sm sm:text-base">
-                    <Camera className="h-4 w-4 sm:h-5 sm:w-5" />
+                  <DialogTitle className="flex items-center space-x-2 text-lg">
+                    <Camera className="h-5 w-5 text-muted-foreground" />
                     <span>Prescription Analysis</span>
                   </DialogTitle>
                 </DialogHeader>
 
                 {!analysisResult ? (
                   <div className="space-y-3 sm:space-y-4">
-                    <p className="text-slate-400 text-xs sm:text-sm">
+                    <p className="text-muted-foreground text-xs sm:text-sm">
                       Upload a photo of your prescription for AI-powered analysis and information.
                     </p>
 
-                    <div className="border-2 border-dashed border-slate-700 rounded-lg p-6 sm:p-8 text-center">
+                    <div className="border-2 border-dashed border-border rounded-xl p-6 sm:p-8 text-center">
                       {analyzingPrescription ? (
                         <div className="space-y-3 sm:space-y-4">
                           <div className="w-10 h-10 sm:w-12 sm:h-12 border-4 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
-                          <p className="text-slate-400 text-xs sm:text-sm">Analyzing prescription...</p>
+                          <p className="text-muted-foreground text-xs sm:text-sm">Analyzing prescription...</p>
                         </div>
                       ) : (
                         <>
-                          <Camera className="h-10 w-10 sm:h-12 sm:w-12 text-slate-400 mx-auto mb-3 sm:mb-4" />
-                          <p className="text-slate-400 text-xs sm:text-sm mb-3 sm:mb-4">Upload prescription image</p>
+                          <Camera className="h-10 w-10 sm:h-12 sm:w-12 text-muted-foreground mx-auto mb-3 sm:mb-4" />
+                          <p className="text-muted-foreground text-xs sm:text-sm mb-3 sm:mb-4">Upload prescription image</p>
                           <Button
                             onClick={handleFileUpload}
-                            className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-xs sm:text-sm"
+                            className="bg-purple-600 hover:bg-purple-700 text-white text-xs sm:text-sm"
                           >
                             <Upload className="mr-1 h-3 w-3 sm:h-4 sm:w-4" />
                             Choose File
@@ -831,45 +841,45 @@ export default function ChatPage() {
                       type="file"
                       accept="image/*"
                       onChange={(e) => {
-                        const file = e.target.files?.[0]
+                        const file = e.target.files?.[0];
                         if (file) {
-                          setAnalyzingPrescription(true)
+                          setAnalyzingPrescription(true);
                           analyzePrescription(file)
                             .then((analysis) => {
-                              setAnalysisResult(analysis)
-                              toast.success("Prescription analyzed successfully!")
+                              setAnalysisResult(analysis);
+                              toast.success("Prescription analyzed successfully!");
                             })
                             .catch((error) => {
-                              console.error("Error analyzing prescription:", error)
-                              toast.error("Failed to analyze prescription")
+                              console.error("Error analyzing prescription:", error);
+                              toast.error("Failed to analyze prescription");
                             })
                             .finally(() => {
-                              setAnalyzingPrescription(false)
-                              if (fileInputRef.current) fileInputRef.current.value = ""
-                            })
+                              setAnalyzingPrescription(false);
+                              if (fileInputRef.current) fileInputRef.current.value = "";
+                            });
                         }
                       }}
                       className="hidden"
                     />
 
-                    <p className="text-xs text-slate-500">
+                    <p className="text-xs text-muted-foreground">
                       Supported formats: JPG, PNG, HEIC. This feature analyzes prescription information for educational
                       purposes only.
                     </p>
                   </div>
                 ) : (
                   <div className="space-y-4 sm:space-y-6">
-                    <Card className="bg-slate-800 border-slate-700">
+                    <Card className="bg-card border-border rounded-xl shadow">
                       <CardHeader>
-                        <CardTitle className="text-white flex items-center space-x-2 text-sm sm:text-base">
-                          <FileText className="h-4 w-4 sm:h-5 sm:w-5" />
+                        <CardTitle className="flex items-center space-x-2 text-lg">
+                          <FileText className="h-5 w-5 text-muted-foreground" />
                           <span>Analysis Results</span>
                         </CardTitle>
                       </CardHeader>
                       <CardContent className="space-y-3 sm:space-y-4">
                         <div className="grid grid-cols-1 gap-3 sm:gap-4">
                           <div>
-                            <h4 className="text-white font-medium text-xs sm:text-sm mb-1 sm:mb-2">Detected Medications</h4>
+                            <h4 className="font-semibold text-sm mb-1 sm:mb-2">Detected Medications</h4>
                             <div className="space-y-1 sm:space-y-2 flex flex-wrap gap-1">
                               {analysisResult.medications.map((med, index) => (
                                 <Badge key={index} className="bg-purple-600 text-white text-xs sm:text-sm mr-1 mb-1">
@@ -881,13 +891,13 @@ export default function ChatPage() {
                           </div>
 
                           <div>
-                            <h4 className="text-white font-medium text-xs sm:text-sm mb-1 sm:mb-2">Dosage Information</h4>
+                            <h4 className="font-semibold text-sm mb-1 sm:mb-2">Dosage Information</h4>
                             <div className="space-y-1 sm:space-y-2 flex flex-wrap gap-1">
                               {analysisResult.dosages.map((dosage, index) => (
                                 <Badge
                                   key={index}
                                   variant="secondary"
-                                  className="bg-slate-700 text-slate-300 text-xs sm:text-sm mr-1 mb-1"
+                                  className="bg-muted text-muted-foreground text-xs sm:text-sm mr-1 mb-1"
                                 >
                                   {dosage}
                                 </Badge>
@@ -897,15 +907,15 @@ export default function ChatPage() {
                         </div>
 
                         <div>
-                          <h4 className="text-white font-medium text-xs sm:text-sm mb-1 sm:mb-2">Instructions</h4>
-                          <p className="text-slate-300 text-xs sm:text-sm bg-slate-700 p-2 sm:p-3 rounded-lg">
+                          <h4 className="font-semibold text-sm mb-1 sm:mb-2">Instructions</h4>
+                          <p className="text-muted-foreground text-xs sm:text-sm bg-muted p-2 sm:p-3 rounded-lg">
                             {analysisResult.instructions}
                           </p>
                         </div>
 
                         {analysisResult.warnings?.length > 0 && (
                           <div>
-                            <h4 className="text-white font-medium text-xs sm:text-sm mb-1 sm:mb-2 flex items-center">
+                            <h4 className="font-semibold text-sm mb-1 sm:mb-2 flex items-center">
                               <AlertCircle className="mr-1 h-4 w-4 sm:h-5 sm:w-5 text-yellow-500" />
                               <span>Warnings & Precautions</span>
                             </h4>
@@ -930,17 +940,17 @@ export default function ChatPage() {
                     <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3">
                       <Button
                         onClick={() => {
-                          setAnalysisResult(null)
-                          setPrescriptionDialogOpen(false)
+                          setAnalysisResult(null);
+                          setPrescriptionDialogOpen(false);
                         }}
                         variant="outline"
-                        className="flex-1 border text-sm text-slate-400 hover:text-white"
+                        className="flex-1 bg-muted border-border text-foreground hover:bg-purple-600 hover:text-white text-sm"
                       >
                         Close
                       </Button>
                       <Button
                         onClick={() => setAnalysisResult(null)}
-                        className="flex-1 bg-gradient-to-br from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-sm"
+                        className="flex-1 bg-purple-600 hover:bg-purple-700 text-white text-sm"
                       >
                         Analyze Another
                       </Button>
@@ -951,21 +961,14 @@ export default function ChatPage() {
             </Dialog>
 
             <Dialog open={historyDialogOpen} onOpenChange={setHistoryDialogOpen}>
-              <DialogContent className="bg-white border-gray-200 text-gray-900 max-w-md mx-auto p-6 sm:p-6">
+              <DialogContent className="bg-card border-border text-foreground max-w-md mx-auto p-6 sm:p-6 rounded-xl shadow">
                 <DialogHeader>
-                  <DialogTitle className="flex items-center justify-between text-base sm:text-lg">
+                  <DialogTitle className="flex items-center justify-between text-lg">
                     <div className="flex items-center space-x-2">
-                      <RotateCcw className="h-5 w-5" />
+                      <RotateCcw className="h-5 w-5 text-muted-foreground" />
                       <span>Recent Chats</span>
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => setHistoryDialogOpen(false)}
-                      className="text-gray-500 hover:text-gray-700 h-10 w-10"
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
+                   
                   </DialogTitle>
                 </DialogHeader>
 
@@ -974,27 +977,27 @@ export default function ChatPage() {
                     sessions.slice(0, 10).map((session) => (
                       <div
                         key={session.id}
-                        className={`p-4 rounded-lg border cursor-pointer transition-colors ${
+                        className={`p-4 rounded-xl border border-border cursor-pointer transition-colors ${
                           currentSession?.id === session.id
-                            ? "bg-blue-50 border-blue-500"
-                            : "bg-gray-100 border-gray-200 hover:bg-gray-200"
+                            ? "bg-purple-600/20 border-purple-600"
+                            : "bg-muted hover:bg-purple-600/10"
                         }`}
                         onClick={() => {
-                          setCurrentSession(session)
-                          setHistoryDialogOpen(false)
+                          setCurrentSession(session);
+                          setHistoryDialogOpen(false);
                         }}
                       >
                         <div className="flex items-start justify-between">
                           <div className="flex-1">
-                            <h3 className="text-gray-900 font-medium text-sm truncate">{session.title}</h3>
-                            <p className="text-gray-500 text-sm">
+                            <h3 className="font-semibold text-sm truncate">{session.title}</h3>
+                            <p className="text-muted-foreground text-sm">
                               {(session.messages || []).length} messages •{" "}
                               {session.updatedAt instanceof Date
                                 ? session.updatedAt.toLocaleDateString()
                                 : (session.updatedAt as any)?.toDate?.()?.toLocaleDateString() || "Recently"}
                             </p>
                             {(session.messages || []).length > 0 && (
-                              <p className="text-gray-400 text-sm mt-1 truncate">
+                              <p className="text-muted-foreground text-sm mt-1 truncate">
                                 {session.messages[session.messages.length - 1]?.message || "No messages"}
                               </p>
                             )}
@@ -1004,18 +1007,18 @@ export default function ChatPage() {
                     ))
                   ) : (
                     <div className="text-center py-8">
-                      <RotateCcw className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                      <p className="text-gray-500 text-sm">No chat history yet</p>
-                      <p className="text-gray-400 text-sm">Start a conversation to see your history here</p>
+                      <RotateCcw className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                      <p className="text-muted-foreground text-sm">No chat history yet</p>
+                      <p className="text-muted-foreground text-sm">Start a conversation to see your history here</p>
                     </div>
                   )}
                 </div>
 
-                <div className="flex justify-end pt-4 border-t border-gray-200">
+                <div className="flex justify-end pt-4 border-t border-border">
                   <Link href="/history">
                     <Button
                       variant="outline"
-                      className="border-gray-300 text-gray-600 hover:text-gray-800 text-sm"
+                      className="bg-muted border-border text-foreground hover:bg-purple-600 hover:text-white text-sm"
                       onClick={() => setHistoryDialogOpen(false)}
                     >
                       View Full History
@@ -1028,5 +1031,5 @@ export default function ChatPage() {
         )}
       </div>
     </AuthGuard>
-  )
+  );
 }

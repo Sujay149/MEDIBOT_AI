@@ -3,6 +3,9 @@
 import Link from "next/link"
 import Image from "next/image"
 import { usePathname } from "next/navigation"
+import { useTheme } from "next-themes"
+import { useEffect, useState } from "react"
+
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import {
@@ -12,6 +15,7 @@ import {
   History,
   User,
   Moon,
+  Sun,
   X,
   Plus,
   LogOut,
@@ -28,6 +32,13 @@ interface SidebarProps {
 export function Sidebar({ isOpen = true, onClose }: SidebarProps) {
   const pathname = usePathname()
   const { user, userProfile, logout } = useAuth()
+
+  const { theme, setTheme } = useTheme()
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   const menuItems = [
     { icon: MessageCircle, label: "AI Chatbot", href: "/chat" },
@@ -48,30 +59,31 @@ export function Sidebar({ isOpen = true, onClose }: SidebarProps) {
     }
   }
 
+  const toggleTheme = () => {
+    setTheme(theme === "dark" ? "light" : "dark")
+  }
+
   return (
     <>
-      {/* Mobile Overlay */}
       {isOpen && <div className="fixed inset-0 bg-black/50 z-40 lg:hidden" onClick={onClose} />}
 
-      {/* Sidebar */}
       <div
         className={cn(
-          "fixed inset-y-0 left-0 z-50 w-80 bg-slate-950 transform transition-transform duration-300 ease-in-out border-r border-slate-800",
+          "fixed inset-y-0 left-0 z-50 w-80 bg-sidebar transition-transform duration-300 ease-in-out border-r border-sidebar-border",
           isOpen ? "translate-x-0" : "-translate-x-full",
           "lg:translate-x-0 lg:static lg:inset-0",
         )}
       >
         <div className="flex flex-col h-full p-4">
-          {/* Header */}
           <div className="flex items-center justify-between mb-8">
             <div className="flex items-center space-x-3">
               <div className="w-8 h-8 relative">
                 <Image src="/logo.png" alt="MedBot Logo" width={32} height={32} className="rounded-full" />
               </div>
-              <span className="text-white font-semibold text-lg">Medibot</span>
+              <span className="text-foreground font-semibold text-lg">Medibot</span>
             </div>
             <div className="flex items-center space-x-2">
-              <Button variant="ghost" size="icon" className="text-slate-400 hover:text-slate-200 hover:bg-slate-800">
+              <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground hover:bg-muted">
                 <Plus className="h-4 w-4" />
               </Button>
               {onClose && (
@@ -79,7 +91,7 @@ export function Sidebar({ isOpen = true, onClose }: SidebarProps) {
                   variant="ghost"
                   size="icon"
                   onClick={onClose}
-                  className="text-slate-400 hover:text-slate-200 hover:bg-slate-800 lg:hidden"
+                  className="text-muted-foreground hover:text-foreground hover:bg-muted lg:hidden"
                 >
                   <X className="h-4 w-4" />
                 </Button>
@@ -87,8 +99,7 @@ export function Sidebar({ isOpen = true, onClose }: SidebarProps) {
             </div>
           </div>
 
-          {/* User Profile */}
-          <div className="bg-slate-900 rounded-xl p-4 mb-6 border border-slate-800">
+          <div className="bg-card rounded-xl p-4 mb-6 border border-border">
             <div className="flex items-center space-x-3">
               <Avatar className="w-12 h-12">
                 <AvatarImage src={userProfile?.photoURL || user?.photoURL || ""} />
@@ -100,15 +111,14 @@ export function Sidebar({ isOpen = true, onClose }: SidebarProps) {
                 </AvatarFallback>
               </Avatar>
               <div className="flex-1 min-w-0">
-                <p className="text-white font-medium truncate">
+                <p className="text-foreground font-medium truncate">
                   {userProfile?.displayName || user?.displayName || user?.email?.split("@")[0] || "User"}
                 </p>
-                <p className="text-slate-400 text-sm truncate">{user?.email || "user@example.com"}</p>
+                <p className="text-muted-foreground text-sm truncate">{user?.email || "user@example.com"}</p>
               </div>
             </div>
           </div>
 
-          {/* Navigation Menu */}
           <nav className="flex-1 space-y-2">
             {menuItems.map((item) => {
               const isActive = pathname === item.href
@@ -120,8 +130,8 @@ export function Sidebar({ isOpen = true, onClose }: SidebarProps) {
                     className={cn(
                       "w-full justify-start text-left h-12 rounded-xl transition-all duration-200",
                       isActive
-                        ? "bg-gradient-to-r from-purple-600 to-blue-600 text-slate-200 hover:from-purple-700 hover:to-blue-700 shadow"
-                        : "text-slate-400 hover:text-slate-300 hover:bg-slate-800"
+                        ? "bg-gradient-to-r from-purple-600 to-blue-600 text-white shadow"
+                        : "text-muted-foreground hover:text-foreground hover:bg-muted"
                     )}
                   >
                     <item.icon className="mr-3 h-5 w-5" />
@@ -132,20 +142,31 @@ export function Sidebar({ isOpen = true, onClose }: SidebarProps) {
             })}
           </nav>
 
-          {/* Theme Toggle & Sign Out */}
           <div className="mt-auto space-y-3">
-            <Button
-              variant="ghost"
-              className="w-full justify-start text-slate-400 hover:text-slate-300 hover:bg-slate-800 rounded-xl h-12 transition-all duration-200"
-            >
-              <Moon className="mr-3 h-5 w-5" />
-              Theme: Dark
-            </Button>
+            {mounted && (
+              <Button
+                variant="ghost"
+                onClick={toggleTheme}
+                className="w-full justify-start text-muted-foreground hover:text-foreground hover:bg-muted rounded-xl h-12 transition-all duration-200"
+              >
+                {theme === "dark" ? (
+                  <>
+                    <Sun className="mr-3 h-5 w-5" />
+                    Theme: Light
+                  </>
+                ) : (
+                  <>
+                    <Moon className="mr-3 h-5 w-5" />
+                    Theme: Dark
+                  </>
+                )}
+              </Button>
+            )}
 
             <Button
               onClick={handleSignOut}
               variant="outline"
-              className="w-full justify-start bg-transparent border-slate-700 text-slate-400 hover:text-red-400 hover:bg-slate-800 rounded-xl h-12 transition-all duration-200"
+              className="w-full justify-start bg-transparent border-border text-muted-foreground hover:text-red-400 hover:bg-muted rounded-xl h-12 transition-all duration-200"
             >
               <LogOut className="mr-3 h-5 w-5" />
               Sign Out

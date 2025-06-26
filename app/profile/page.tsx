@@ -13,6 +13,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Menu, User, Palette, Bell, Shield, Database, Camera } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { updateUserProfile, uploadProfilePicture, type UserProfile as FirestoreUserProfile } from "@/lib/firestore";
+import { toast } from "sonner";
 
 // Extend the UserProfile type locally to include all preference fields used in this file
 type ExtendedPreferences = {
@@ -31,8 +32,6 @@ type ExtendedPreferences = {
 type ExtendedUserProfile = Omit<FirestoreUserProfile, "preferences"> & {
   preferences: ExtendedPreferences;
 };
-import { toast } from "sonner";
-// import { debounce } from "lodash"; // Uncomment for autosave feature
 
 // Validation regex patterns
 const PHONE_REGEX = /^\+?[1-9]\d{1,14}$/;
@@ -118,61 +117,6 @@ export default function ProfilePage() {
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [hasUnsavedChanges]);
 
-  // Optional: Load form data from localStorage on mount
-  /*
-  useEffect(() => {
-    const savedFormData = localStorage.getItem("profileFormData");
-    if (savedFormData) {
-      setFormData(JSON.parse(savedFormData));
-    }
-  }, []);
-  */
-
-  // Optional: Save form data to localStorage on change
-  /*
-  useEffect(() => {
-    localStorage.setItem("profileFormData", JSON.stringify(formData));
-  }, [formData]);
-  */
-
-  // Optional: Debounced autosave to Firestore
-  /*
-  const debouncedUpdateProfile = debounce(async (data: Partial<UserProfile>) => {
-    if (user) {
-      try {
-        await updateUserProfile(user.uid, data);
-        setHasUnsavedChanges(false);
-        toast.success("Profile autosaved!");
-      } catch (error) {
-        console.error("Autosave error:", error);
-        toast.error("Failed to autosave profile");
-      }
-    }
-  }, 1000);
-
-  useEffect(() => {
-    if (hasUnsavedChanges) {
-      debouncedUpdateProfile({
-        displayName: formData.displayName,
-        dateOfBirth: formData.dateOfBirth,
-        gender: formData.gender,
-        phoneNumber: formData.phoneNumber,
-        emergencyContact: {
-          name: formData.emergencyContactName,
-          phone: formData.emergencyContactPhone,
-          relationship: formData.emergencyContactRelationship,
-        },
-        medicalInfo: {
-          allergies: formData.allergies.split(",").map((a) => a.trim()).filter((a) => a),
-          conditions: formData.conditions.split(",").map((c) => c.trim()).filter((c) => c),
-          bloodType: formData.bloodType,
-        },
-        preferences: formData.preferences,
-      });
-    }
-  }, [formData]);
-  */
-
   // Validate form fields
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
@@ -254,7 +198,6 @@ export default function ProfilePage() {
 
       await updateUserProfile(user.uid, updateData);
       setHasUnsavedChanges(false);
-      // localStorage.removeItem("profileFormData"); // Uncomment if using localStorage
       toast.success("Profile updated successfully!");
     } catch (error) {
       console.error("Error updating profile:", error);
@@ -292,7 +235,7 @@ export default function ProfilePage() {
       profile: userProfile,
       exportDate: new Date().toISOString(),
       note: "This is your Medibot data export",
-      };
+    };
 
     const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
@@ -316,465 +259,435 @@ export default function ProfilePage() {
 
   return (
     <AuthGuard>
-      <div className="flex h-screen bg-slate-950">
-        <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      <div className="bg-background text-foreground min-h-screen">
+        <div className="flex h-screen overflow-hidden">
+          <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
-        <div className="flex-1 flex flex-col">
-          {/* Header */}
-          <div className="flex items-center justify-between p-4 border-b border-slate-800 bg-slate-900">
-            <div className="flex items-center space-x-3">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setSidebarOpen(true)}
-                className="text-slate-400 hover:text-white lg:hidden"
-                aria-label="Open sidebar"
-              >
-                <Menu className="h-5 w-5" />
-              </Button>
-              <div className="w-8 h-8 bg-slate-700 rounded-full flex items-center justify-center">
-                <User className="h-4 w-4 text-slate-400" />
+          <div className="flex-1 flex flex-col">
+            {/* Header */}
+            <div className="flex items-center justify-between p-4 border-b border-border bg-card">
+              <div className="flex items-center space-x-3">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setSidebarOpen(true)}
+                  className="text-muted-foreground lg:hidden h-10 w-10"
+                  aria-label="Open sidebar"
+                >
+                  <Menu className="h-5 w-5" />
+                </Button>
+                <h1 className="font-semibold text-lg">Profile Settings</h1>
               </div>
-              <span className="text-white font-semibold">Profile Settings</span>
             </div>
-          </div>
 
-          {/* Content */}
-          <div className="flex-1 p-4 sm:p-6 overflow-y-auto">
-            <div className="max-w-4xl mx-auto space-y-6">
-              {/* Profile Settings */}
-              <Card className="bg-slate-900 border-slate-800">
-                <CardHeader className="flex flex-row items-center space-y-0 pb-4">
-                  <User className="h-5 w-5 text-slate-400 mr-2" />
-                  <CardTitle className="text-white">Profile Settings</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <form onSubmit={handleUpdateProfile} className="space-y-6">
-                    {/* Profile Picture */}
-                    <div className="flex items-center space-x-6">
-                      <Avatar className="w-20 h-20">
-                        <AvatarImage src={userProfile?.photoURL || user?.photoURL || ""} />
-                        <AvatarFallback className="bg-purple-600 text-white text-2xl font-semibold">
-                          {formData.displayName?.charAt(0).toUpperCase() || user?.email?.charAt(0).toUpperCase() || "U"}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          className="bg-slate-800 border-slate-700 text-white hover:bg-slate-700"
-                          onClick={() => fileInputRef.current?.click()}
-                          disabled={uploadingPhoto}
-                          aria-label="Change profile picture"
-                        >
-                          {uploadingPhoto ? (
-                            <>
-                              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
-                              Uploading...
-                            </>
-                          ) : (
-                            <>
-                              <Camera className="mr-2 h-4 w-4" />
-                              Change Photo
-                            </>
-                          )}
-                        </Button>
-                        <input
-                          ref={fileInputRef}
-                          type="file"
-                          accept="image/*"
-                          onChange={handlePhotoUpload}
-                          className="hidden"
-                          aria-hidden="true"
-                        />
-                        <p className="text-slate-400 text-sm mt-2">JPG, PNG, or GIF. Max size 2MB.</p>
-                      </div>
-                    </div>
-
-                    {/* Basic Information */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label htmlFor="displayName" className="block text-slate-300 text-sm font-medium mb-2">
-                          Display Name
-                        </label>
-                        <Input
-                          id="displayName"
-                          value={formData.displayName}
-                          onChange={(e) => handleInputChange("displayName", e.target.value)}
-                          className="bg-slate-800 border-slate-700 text-white"
-                          placeholder="Enter your display name"
-                          aria-describedby="displayName-error"
-                          required
-                        />
-                        {errors.displayName && (
-                          <p id="displayName-error" className="text-red-500 text-xs mt-1">
-                            {errors.displayName}
-                          </p>
-                        )}
-                      </div>
-                      <div>
-                        <label htmlFor="email" className="block text-slate-300 text-sm font-medium mb-2">
-                          Email Address
-                        </label>
-                        <Input
-                          id="email"
-                          value={formData.email}
-                          disabled
-                          className="bg-slate-800 border-slate-700 text-slate-400"
-                          aria-describedby="email-note"
-                        />
-                        <p id="email-note" className="text-slate-500 text-xs mt-1">
-                          Email cannot be changed
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Personal Information */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div>
-                        <label htmlFor="dateOfBirth" className="block text-slate-300 text-sm font-medium mb-2">
-                          Date of Birth
-                        </label>
-                        <Input
-                          id="dateOfBirth"
-                          type="date"
-                          value={formData.dateOfBirth}
-                          onChange={(e) => handleInputChange("dateOfBirth", e.target.value)}
-                          className="bg-slate-800 border-slate-700 text-white"
-                          max={new Date().toISOString().split("T")[0]}
-                        />
-                      </div>
-                      <div>
-                        <label htmlFor="gender" className="block text-slate-300 text-sm font-medium mb-2">
-                          Gender
-                        </label>
-                        <Select
-                          value={formData.gender}
-                          onValueChange={(value) => handleInputChange("gender", value)}
-                        >
-                          <SelectTrigger
-                            id="gender"
-                            className="bg-slate-800 border-slate-700 text-white"
-                            aria-label="Select gender"
+            {/* Content */}
+            <div className="flex-1 p-4 md:p-6 overflow-y-auto">
+              <div className="max-w-4xl mx-auto space-y-6">
+                {/* Profile Settings */}
+                <Card className="bg-card border-border rounded-xl shadow">
+                  <CardHeader className="flex flex-row items-center space-y-0 pb-4">
+                    <User className="h-5 w-5 text-muted-foreground mr-2" />
+                    <CardTitle>Profile Settings</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <form onSubmit={handleUpdateProfile} className="space-y-6">
+                      {/* Profile Picture */}
+                      <div className="flex items-center space-x-6">
+                        <Avatar className="w-20 h-20">
+                          <AvatarImage src={userProfile?.photoURL || user?.photoURL || ""} />
+                          <AvatarFallback className="bg-purple-600 text-white text-2xl font-semibold">
+                            {formData.displayName?.charAt(0).toUpperCase() || user?.email?.charAt(0).toUpperCase() || "U"}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="bg-muted border-border text-foreground hover:bg-purple-600 hover:text-white"
+                            onClick={() => fileInputRef.current?.click()}
+                            disabled={uploadingPhoto}
+                            aria-label="Change profile picture"
                           >
-                            <SelectValue placeholder="Select gender" />
-                          </SelectTrigger>
-                          <SelectContent className="bg-slate-900 border-2 border-purple-600 text-white shadow-lg">
-                            <SelectItem value="male">Male</SelectItem>
-                            <SelectItem value="female">Female</SelectItem>
-                            <SelectItem value="other">Other</SelectItem>
-                            <SelectItem value="prefer-not-to-say">Prefer not to say</SelectItem>
-                          </SelectContent>
-                        </Select>
+                            {uploadingPhoto ? (
+                              <>
+                                <div className="w-4 h-4 border-2 border-foreground border-t-transparent rounded-full animate-spin mr-2" />
+                                Uploading...
+                              </>
+                            ) : (
+                              <>
+                                <Camera className="mr-2 h-4 w-4" />
+                                Change Photo
+                              </>
+                            )}
+                          </Button>
+                          <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept="image/*"
+                            onChange={handlePhotoUpload}
+                            className="hidden"
+                            aria-hidden="true"
+                          />
+                          <p className="text-muted-foreground text-sm mt-2">JPG, PNG, or GIF. Max size 2MB.</p>
+                        </div>
                       </div>
-                      <div>
-                        <label htmlFor="phoneNumber" className="block text-slate-300 text-sm font-medium mb-2">
-                          Phone Number
-                        </label>
-                        <Input
-                          id="phoneNumber"
-                          type="tel"
-                          value={formData.phoneNumber}
-                          onChange={(e) => handleInputChange("phoneNumber", e.target.value)}
-                          className="bg-slate-800 border-slate-700 text-white"
-                          placeholder="+1234567890"
-                          aria-describedby="phoneNumber-error"
-                        />
-                        {errors.phoneNumber && (
-                          <p id="phoneNumber-error" className="text-red-500 text-xs mt-1">
-                            {errors.phoneNumber}
-                          </p>
-                        )}
-                      </div>
-                    </div>
 
-                    {/* Emergency Contact */}
-                    <div className="space-y-4">
-                      <h3 className="text-white font-medium text-lg">Emergency Contact</h3>
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div>
-                          <label htmlFor="emergencyContactName" className="block text-slate-300 text-sm font-medium mb-2">
-                            Contact Name
-                          </label>
-                          <Input
-                            id="emergencyContactName"
-                            value={formData.emergencyContactName}
-                            onChange={(e) => handleInputChange("emergencyContactName", e.target.value)}
-                            className="bg-slate-800 border-slate-700 text-white"
-                            placeholder="Emergency contact name"
-                            aria-describedby="emergencyContactName-error"
-                          />
-                          {errors.emergencyContactName && (
-                            <p id="emergencyContactName-error" className="text-red-500 text-xs mt-1">
-                              {errors.emergencyContactName}
-                            </p>
-                          )}
-                        </div>
-                        <div>
-                          <label htmlFor="emergencyContactPhone" className="block text-slate-300 text-sm font-medium mb-2">
-                            Contact Phone
-                          </label>
-                          <Input
-                            id="emergencyContactPhone"
-                            type="tel"
-                            value={formData.emergencyContactPhone}
-                            onChange={(e) => handleInputChange("emergencyContactPhone", e.target.value)}
-                            className="bg-slate-800 border-slate-700 text-white"
-                            placeholder="+1234567890"
-                            aria-describedby="emergencyContactPhone-error"
-                          />
-                          {errors.emergencyContactPhone && (
-                            <p id="emergencyContactPhone-error" className="text-red-500 text-xs mt-1">
-                              {errors.emergencyContactPhone}
-                            </p>
-                          )}
-                        </div>
-                        <div>
-                          <label
-                            htmlFor="emergencyContactRelationship"
-                            className="block text-slate-300 text-sm font-medium mb-2"
-                          >
-                            Relationship
-                          </label>
-                          <Input
-                            id="emergencyContactRelationship"
-                            value={formData.emergencyContactRelationship}
-                            onChange={(e) => handleInputChange("emergencyContactRelationship", e.target.value)}
-                            className="bg-slate-800 border-slate-700 text-white"
-                            placeholder="e.g., Parent, Spouse"
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Medical Information */}
-                    <div className="space-y-4">
-                      <h3 className="text-white font-medium text-lg">Medical Information</h3>
+                      {/* Basic Information */}
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                          <label htmlFor="allergies" className="block text-slate-300 text-sm font-medium mb-2">
-                            Allergies
+                          <label htmlFor="displayName" className="block text-sm font-medium text-muted-foreground mb-1">
+                            Display Name
                           </label>
                           <Input
-                            id="allergies"
-                            value={formData.allergies}
-                            onChange={(e) => handleInputChange("allergies", e.target.value)}
-                            className="bg-slate-800 border-slate-700 text-white"
-                            placeholder="e.g., Penicillin, Peanuts (comma separated)"
+                            id="displayName"
+                            value={formData.displayName}
+                            onChange={(e) => handleInputChange("displayName", e.target.value)}
+                            className="bg-muted border-border text-foreground focus:outline-none focus:ring-2 focus:ring-purple-600"
+                            placeholder="Enter your display name"
+                            aria-describedby="displayName-error"
+                            required
+                          />
+                          {errors.displayName && (
+                            <p id="displayName-error" className="text-red-500 text-xs mt-1">
+                              {errors.displayName}
+                            </p>
+                          )}
+                        </div>
+                        <div>
+                          <label htmlFor="email" className="block text-sm font-medium text-muted-foreground mb-1">
+                            Email Address
+                          </label>
+                          <Input
+                            id="email"
+                            value={formData.email}
+                            disabled
+                            className="bg-muted border-border text-muted-foreground"
+                            aria-describedby="email-note"
+                          />
+                          <p id="email-note" className="text-muted-foreground text-xs mt-1">
+                            Email cannot be changed
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Personal Information */}
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                          <label htmlFor="dateOfBirth" className="block text-sm font-medium text-muted-foreground mb-1">
+                            Date of Birth
+                          </label>
+                          <Input
+                            id="dateOfBirth"
+                            type="date"
+                            value={formData.dateOfBirth}
+                            onChange={(e) => handleInputChange("dateOfBirth", e.target.value)}
+                            className="bg-muted border-border text-foreground focus:outline-none focus:ring-2 focus:ring-purple-600"
+                            max={new Date().toISOString().split("T")[0]}
                           />
                         </div>
                         <div>
-                          <label htmlFor="conditions" className="block text-slate-300 text-sm font-medium mb-2">
-                            Medical Conditions
+                          <label htmlFor="gender" className="block text-sm font-medium text-muted-foreground mb-1">
+                            Gender
+                          </label>
+                          <Select
+                            value={formData.gender}
+                            onValueChange={(value) => handleInputChange("gender", value)}
+                          >
+                            <SelectTrigger
+                              id="gender"
+                              className="bg-muted border-border text-foreground focus:outline-none focus:ring-2 focus:ring-purple-600"
+                              aria-label="Select gender"
+                            >
+                              <SelectValue placeholder="Select gender" />
+                            </SelectTrigger>
+                            <SelectContent className="bg-card border-border text-foreground shadow-lg">
+                              <SelectItem value="male">Male</SelectItem>
+                              <SelectItem value="female">Female</SelectItem>
+                              <SelectItem value="other">Other</SelectItem>
+                              <SelectItem value="prefer-not-to-say">Prefer not to say</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <label htmlFor="phoneNumber" className="block text-sm font-medium text-muted-foreground mb-1">
+                            Phone Number
                           </label>
                           <Input
-                            id="conditions"
-                            value={formData.conditions}
-                            onChange={(e) => handleInputChange("conditions", e.target.value)}
-                            className="bg-slate-800 border-slate-700 text-white"
-                            placeholder="e.g., Diabetes, Hypertension (comma separated)"
+                            id="phoneNumber"
+                            type="tel"
+                            value={formData.phoneNumber}
+                            onChange={(e) => handleInputChange("phoneNumber", e.target.value)}
+                            className="bg-muted border-border text-foreground focus:outline-none focus:ring-2 focus:ring-purple-600"
+                            placeholder="+1234567890"
+                            aria-describedby="phoneNumber-error"
                           />
+                          {errors.phoneNumber && (
+                            <p id="phoneNumber-error" className="text-red-500 text-xs mt-1">
+                              {errors.phoneNumber}
+                            </p>
+                          )}
                         </div>
                       </div>
-                      <div className="w-full md:w-1/3">
-                        <label htmlFor="bloodType" className="block text-slate-300 text-sm font-medium mb-2">
-                          Blood Type
-                        </label>
-                        <Select
-                          value={formData.bloodType}
-                          onValueChange={(value) => handleInputChange("bloodType", value)}
-                        >
-                          <SelectTrigger
-                            id="bloodType"
-                            className="bg-slate-800 border-slate-700 text-white"
-                            aria-label="Select blood type"
-                          >
-                            <SelectValue placeholder="Select blood type" />
-                          </SelectTrigger>
-                          <SelectContent className="bg-slate-900 border-2 border-purple-600 text-white shadow-lg">
-                            <SelectItem value="A+">A+</SelectItem>
-                            <SelectItem value="A-">A-</SelectItem>
-                            <SelectItem value="B+">B+</SelectItem>
-                            <SelectItem value="B-">B-</SelectItem>
-                            <SelectItem value="AB+">AB+</SelectItem>
-                            <SelectItem value="AB-">AB-</SelectItem>
-                            <SelectItem value="O+">O+</SelectItem>
-                            <SelectItem value="O-">O-</SelectItem>
-                          </SelectContent>
-                        </Select>
+
+                      {/* Emergency Contact */}
+                      <div className="space-y-4">
+                        <h3 className="text-lg font-bold">Emergency Contact</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          <div>
+                            <label htmlFor="emergencyContactName" className="block text-sm font-medium text-muted-foreground mb-1">
+                              Contact Name
+                            </label>
+                            <Input
+                              id="emergencyContactName"
+                              value={formData.emergencyContactName}
+                              onChange={(e) => handleInputChange("emergencyContactName", e.target.value)}
+                              className="bg-muted border-border text-foreground focus:outline-none focus:ring-2 focus:ring-purple-600"
+                              placeholder="Emergency contact name"
+                              aria-describedby="emergencyContactName-error"
+                            />
+                            {errors.emergencyContactName && (
+                              <p id="emergencyContactName-error" className="text-red-500 text-xs mt-1">
+                                {errors.emergencyContactName}
+                              </p>
+                            )}
+                          </div>
+                          <div>
+                            <label htmlFor="emergencyContactPhone" className="block text-sm font-medium text-muted-foreground mb-1">
+                              Contact Phone
+                            </label>
+                            <Input
+                              id="emergencyContactPhone"
+                              type="tel"
+                              value={formData.emergencyContactPhone}
+                              onChange={(e) => handleInputChange("emergencyContactPhone", e.target.value)}
+                              className="bg-muted border-border text-foreground focus:outline-none focus:ring-2 focus:ring-purple-600"
+                              placeholder="+1234567890"
+                              aria-describedby="emergencyContactPhone-error"
+                            />
+                            {errors.emergencyContactPhone && (
+                              <p id="emergencyContactPhone-error" className="text-red-500 text-xs mt-1">
+                                {errors.emergencyContactPhone}
+                              </p>
+                            )}
+                          </div>
+                          <div>
+                            <label
+                              htmlFor="emergencyContactRelationship"
+                              className="block text-sm font-medium text-muted-foreground mb-1"
+                            >
+                              Relationship
+                            </label>
+                            <Input
+                              id="emergencyContactRelationship"
+                              value={formData.emergencyContactRelationship}
+                              onChange={(e) => handleInputChange("emergencyContactRelationship", e.target.value)}
+                              className="bg-muted border-border text-foreground focus:outline-none focus:ring-2 focus:ring-purple-600"
+                              placeholder="e.g., Parent, Spouse"
+                            />
+                          </div>
+                        </div>
                       </div>
-                    </div>
 
-                    <Button
-                      type="submit"
-                      disabled={loading || Object.keys(errors).length > 0}
-                      className="bg-purple-600 hover:bg-purple-700 text-white"
-                      aria-label="Update profile"
-                    >
-                      {loading ? "Updating..." : "Update Profile"}
-                    </Button>
-                  </form>
-                </CardContent>
-              </Card>
+                      {/* Medical Information */}
+                      <div className="space-y-4">
+                        <h3 className="text-lg font-bold">Medical Information</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <label htmlFor="allergies" className="block text-sm font-medium text-muted-foreground mb-1">
+                              Allergies
+                            </label>
+                            <Input
+                              id="allergies"
+                              value={formData.allergies}
+                              onChange={(e) => handleInputChange("allergies", e.target.value)}
+                              className="bg-muted border-border text-foreground focus:outline-none focus:ring-2 focus:ring-purple-600"
+                              placeholder="e.g., Penicillin, Peanuts (comma separated)"
+                            />
+                          </div>
+                          <div>
+                            <label htmlFor="conditions" className="block text-sm font-medium text-muted-foreground mb-1">
+                              Medical Conditions
+                            </label>
+                            <Input
+                              id="conditions"
+                              value={formData.conditions}
+                              onChange={(e) => handleInputChange("conditions", e.target.value)}
+                              className="bg-muted border-border text-foreground focus:outline-none focus:ring-2 focus:ring-purple-600"
+                              placeholder="e.g., Diabetes, Hypertension (comma separated)"
+                            />
+                          </div>
+                        </div>
+                        <div className="w-full md:w-1/3">
+                          <label htmlFor="bloodType" className="block text-sm font-medium text-muted-foreground mb-1">
+                            Blood Type
+                          </label>
+                          <Select
+                            value={formData.bloodType}
+                            onValueChange={(value) => handleInputChange("bloodType", value)}
+                          >
+                            <SelectTrigger
+                              id="bloodType"
+                              className="bg-muted border-border text-foreground focus:outline-none focus:ring-2 focus:ring-purple-600"
+                              aria-label="Select blood type"
+                            >
+                              <SelectValue placeholder="Select blood type" />
+                            </SelectTrigger>
+                            <SelectContent className="bg-card border-border text-foreground shadow-lg">
+                              <SelectItem value="A+">A+</SelectItem>
+                              <SelectItem value="A-">A-</SelectItem>
+                              <SelectItem value="B+">B+</SelectItem>
+                              <SelectItem value="B-">B-</SelectItem>
+                              <SelectItem value="AB+">AB+</SelectItem>
+                              <SelectItem value="AB-">AB-</SelectItem>
+                              <SelectItem value="O+">O+</SelectItem>
+                              <SelectItem value="O-">O-</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
 
-              {/* Appearance */}
-              <Card className="bg-slate-900 border-slate-800">
-                <CardHeader className="flex flex-row items-center space-y-0 pb-4">
-                  <Palette className="h-5 w-5 text-slate-400 mr-2" />
-                  <CardTitle className="text-white">Appearance</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div>
-                    <label htmlFor="theme" className="block text-slate-300 text-sm font-medium mb-2">
-                      Theme Preference
-                    </label>
-                    <Select
-                      value={formData.preferences.theme}
-                      onValueChange={(value: "dark" | "light") => handlePreferenceChange("theme", value)}
-                    >
-                      <SelectTrigger
-                        id="theme"
-                        className="bg-slate-800 border-slate-700 text-white"
-                        aria-label="Select theme"
+                      <Button
+                        type="submit"
+                        disabled={loading || Object.keys(errors).length > 0}
+                        className="bg-purple-600 hover:bg-purple-700 text-white font-semibold w-full"
+                        aria-label="Update profile"
                       >
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent className="bg-slate-800 border-slate-700">
-                        <SelectItem value="dark">🌙 Theme: Dark</SelectItem>
-                        <SelectItem value="light">☀️ Theme: Light</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </CardContent>
-              </Card>
+                        {loading ? "Updating..." : "Update Profile"}
+                      </Button>
+                    </form>
+                  </CardContent>
+                </Card>
 
-              {/* Notifications */}
-              <Card className="bg-slate-900 border-slate-800">
-                <CardHeader className="flex flex-row items-center space-y-0 pb-4">
-                  <Bell className="h-5 w-5 text-slate-400 mr-2" />
-                  <CardTitle className="text-white">Notifications</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-white font-medium">Medication Reminders</p>
-                      <p className="text-slate-400 text-sm">Get notified to take your medications</p>
-                    </div>
-                    <Switch
-                      checked={formData.preferences.medicationReminders}
-                      onCheckedChange={(checked) => handlePreferenceChange("medicationReminders", checked)}
-                      aria-label="Toggle medication reminders"
-                    />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-white font-medium">Appointment Reminders</p>
-                      <p className="text-slate-400 text-sm">Reminders for upcoming medical appointments</p>
-                    </div>
-                    <Switch
-                      checked={formData.preferences.appointmentReminders}
-                      onCheckedChange={(checked) => handlePreferenceChange("appointmentReminders", checked)}
-                      aria-label="Toggle appointment reminders"
-                    />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-white font-medium">Health Tips</p>
-                      <p className="text-slate-400 text-sm">General health tips and wellness advice</p>
-                    </div>
-                    <Switch
-                      checked={formData.preferences.healthTips}
-                      onCheckedChange={(checked) => handlePreferenceChange("healthTips", checked)}
-                      aria-label="Toggle health tips"
-                    />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-white font-medium">Email Notifications</p>
-                      <p className="text-slate-400 text-sm">Receive notifications via email</p>
-                    </div>
-                    <Switch
-                      checked={formData.preferences.emailNotifications}
-                      onCheckedChange={(checked) => handlePreferenceChange("emailNotifications", checked)}
-                      aria-label="Toggle email notifications"
-                    />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-white font-medium">Push Notifications</p>
-                      <p className="text-slate-400 text-sm">Receive push notifications on your device</p>
-                    </div>
-                    <Switch
-                      checked={formData.preferences.pushNotifications}
-                      onCheckedChange={(checked) => handlePreferenceChange("pushNotifications", checked)}
-                      aria-label="Toggle push notifications"
-                    />
-                  </div>
-                </CardContent>
-              </Card>
+               
 
-              {/* Privacy & Security */}
-              <Card className="bg-slate-900 border-slate-800">
-                <CardHeader className="flex flex-row items-center space-y-0 pb-4">
-                  <Shield className="h-5 w-5 text-slate-400 mr-2" />
-                  <CardTitle className="text-white">Privacy & Security</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-white font-medium">Share Data for Research</p>
-                      <p className="text-slate-400 text-sm">Help improve healthcare by sharing anonymized data</p>
+                {/* Notifications */}
+                <Card className="bg-card border-border rounded-xl shadow">
+                  <CardHeader className="flex flex-row items-center space-y-0 pb-4">
+                    <Bell className="h-5 w-5 text-muted-foreground mr-2" />
+                    <CardTitle>Notifications</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium">Medication Reminders</p>
+                        <p className="text-muted-foreground text-sm">Get notified to take your medications</p>
+                      </div>
+                      <Switch
+                        checked={formData.preferences.medicationReminders}
+                        onCheckedChange={(checked) => handlePreferenceChange("medicationReminders", checked)}
+                        aria-label="Toggle medication reminders"
+                      />
                     </div>
-                    <Switch
-                      checked={formData.preferences.shareDataForResearch}
-                      onCheckedChange={(checked) => handlePreferenceChange("shareDataForResearch", checked)}
-                      aria-label="Toggle data sharing for research"
-                    />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-white font-medium">Save Conversations</p>
-                      <p className="text-slate-400 text-sm">Keep chat history for future reference</p>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium">Appointment Reminders</p>
+                        <p className="text-muted-foreground text-sm">Reminders for upcoming medical appointments</p>
+                      </div>
+                      <Switch
+                        checked={formData.preferences.appointmentReminders}
+                        onCheckedChange={(checked) => handlePreferenceChange("appointmentReminders", checked)}
+                        aria-label="Toggle appointment reminders"
+                      />
                     </div>
-                    <Switch
-                      checked={formData.preferences.saveConversations}
-                      onCheckedChange={(checked) => handlePreferenceChange("saveConversations", checked)}
-                      aria-label="Toggle save conversations"
-                    />
-                  </div>
-                </CardContent>
-              </Card>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium">Health Tips</p>
+                        <p className="text-muted-foreground text-sm">General health tips and wellness advice</p>
+                      </div>
+                      <Switch
+                        checked={formData.preferences.healthTips}
+                        onCheckedChange={(checked) => handlePreferenceChange("healthTips", checked)}
+                        aria-label="Toggle health tips"
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium">Email Notifications</p>
+                        <p className="text-muted-foreground text-sm">Receive notifications via email</p>
+                      </div>
+                      <Switch
+                        checked={formData.preferences.emailNotifications}
+                        onCheckedChange={(checked) => handlePreferenceChange("emailNotifications", checked)}
+                        aria-label="Toggle email notifications"
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium">Push Notifications</p>
+                        <p className="text-muted-foreground text-sm">Receive push notifications on your device</p>
+                      </div>
+                      <Switch
+                        checked={formData.preferences.pushNotifications}
+                        onCheckedChange={(checked) => handlePreferenceChange("pushNotifications", checked)}
+                        aria-label="Toggle push notifications"
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
 
-              {/* Data Management */}
-              <Card className="bg-slate-900 border-slate-800">
-                <CardHeader className="flex flex-row items-center space-y-0 pb-4">
-                  <Database className="h-5 w-5 text-slate-400 mr-2" />
-                  <CardTitle className="text-white">Data Management</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-4">
-                    <Button
-                      onClick={handleExportData}
-                      variant="outline"
-                      className="bg-slate-800 border-slate-700 text-white hover:bg-slate-700"
-                      aria-label="Export my data"
-                    >
-                      📤 Export My Data
-                    </Button>
-                    <Button
-                      onClick={handleClearData}
-                      variant="destructive"
-                      className="bg-red-600 hover:bg-red-700"
-                      aria-label="Clear all data"
-                    >
-                      🗑️ Clear All Data
-                    </Button>
-                  </div>
-                  <p className="text-slate-400 text-sm">
-                    Export your data to keep a backup, or clear all your data to start fresh.
-                  </p>
-                </CardContent>
-              </Card>
+                {/* Privacy & Security */}
+                <Card className="bg-card border-border rounded-xl shadow">
+                  <CardHeader className="flex flex-row items-center space-y-0 pb-4">
+                    <Shield className="h-5 w-5 text-muted-foreground mr-2" />
+                    <CardTitle>Privacy & Security</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium">Share Data for Research</p>
+                        <p className="text-muted-foreground text-sm">Help improve healthcare by sharing anonymized data</p>
+                      </div>
+                      <Switch
+                        checked={formData.preferences.shareDataForResearch}
+                        onCheckedChange={(checked) => handlePreferenceChange("shareDataForResearch", checked)}
+                        aria-label="Toggle data sharing for research"
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium">Save Conversations</p>
+                        <p className="text-muted-foreground text-sm">Keep chat history for future reference</p>
+                      </div>
+                      <Switch
+                        checked={formData.preferences.saveConversations}
+                        onCheckedChange={(checked) => handlePreferenceChange("saveConversations", checked)}
+                        aria-label="Toggle save conversations"
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Data Management */}
+                <Card className="bg-card border-border rounded-xl shadow">
+                  <CardHeader className="flex flex-row items-center space-y-0 pb-4">
+                    <Database className="h-5 w-5 text-muted-foreground mr-2" />
+                    <CardTitle>Data Management</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-4">
+                      <Button
+                        onClick={handleExportData}
+                        variant="outline"
+                        className="bg-muted border-border text-foreground hover:bg-purple-600 hover:text-white"
+                        aria-label="Export my data"
+                      >
+                        📤 Export My Data
+                      </Button>
+                      <Button
+                        onClick={handleClearData}
+                        variant="destructive"
+                        className="bg-red-600 hover:bg-red-700 text-white"
+                        aria-label="Clear all data"
+                      >
+                        🗑️ Clear All Data
+                      </Button>
+                    </div>
+                    <p className="text-muted-foreground text-sm">
+                      Export your data to keep a backup, or clear all your data to start fresh.
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
             </div>
           </div>
         </div>
