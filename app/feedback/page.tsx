@@ -132,6 +132,7 @@ export default function FeedbackPage() {
                     <p className="text-muted-foreground text-sm mb-2">
                       Need help or want to share something directly?
                     </p>
+                    
                     <a
                       href="https://wa.me/919346491221"
                       target="_blank"

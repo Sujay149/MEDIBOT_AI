@@ -16,8 +16,6 @@ import {
   User,
   Moon,
   Sun,
-  X,
-  Plus,
   LogOut,
   Calendar
 } from "lucide-react"
@@ -29,7 +27,7 @@ interface SidebarProps {
   onClose?: () => void
 }
 
-export function Sidebar({ isOpen = true, onClose }: SidebarProps) {
+export function Sidebar({ isOpen = true }: SidebarProps) {
   const pathname = usePathname()
   const { user, userProfile, logout } = useAuth()
 
@@ -53,7 +51,6 @@ export function Sidebar({ isOpen = true, onClose }: SidebarProps) {
   const handleSignOut = async () => {
     try {
       await logout()
-      if (onClose) onClose()
     } catch (error) {
       console.error("Error signing out:", error)
     }
@@ -65,7 +62,7 @@ export function Sidebar({ isOpen = true, onClose }: SidebarProps) {
 
   return (
     <>
-      {isOpen && <div className="fixed inset-0 bg-black/50 z-40 lg:hidden" onClick={onClose} />}
+      {isOpen && <div className="fixed inset-0 bg-black/50 z-40 lg:hidden" />}
 
       <div
         className={cn(
@@ -81,21 +78,6 @@ export function Sidebar({ isOpen = true, onClose }: SidebarProps) {
                 <Image src="/logo.png" alt="MedBot Logo" width={32} height={32} className="rounded-full" />
               </div>
               <span className="text-foreground font-semibold text-lg">Medibot</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground hover:bg-muted">
-                <Plus className="h-4 w-4" />
-              </Button>
-              {onClose && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={onClose}
-                  className="text-muted-foreground hover:text-foreground hover:bg-muted lg:hidden"
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              )}
             </div>
           </div>
 
