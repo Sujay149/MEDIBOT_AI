@@ -287,7 +287,7 @@ export default function ProfilePage() {
                 <Card className="bg-card border-border rounded-xl shadow">
                   <CardHeader className="flex flex-row items-center space-y-0 pb-4">
                     <User className="h-5 w-5 text-muted-foreground mr-2" />
-                    <CardTitle>Profile Settings</CardTitle>
+<CardTitle className="text-foreground">Profile Settings</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <form onSubmit={handleUpdateProfile} className="space-y-6">
@@ -431,8 +431,7 @@ export default function ProfilePage() {
 
                       {/* Emergency Contact */}
                       <div className="space-y-4">
-                        <h3 className="text-lg font-bold">Emergency Contact</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+<h3 className="text-lg font-bold text-foreground">Emergency Contact</h3>                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                           <div>
                             <label htmlFor="emergencyContactName" className="block text-sm font-medium text-muted-foreground mb-1">
                               Contact Name
@@ -490,7 +489,7 @@ export default function ProfilePage() {
 
                       {/* Medical Information */}
                       <div className="space-y-4">
-                        <h3 className="text-lg font-bold">Medical Information</h3>
+<h3 className="text-lg font-bold text-foreground">Medical Information</h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <div>
                             <label htmlFor="allergies" className="block text-sm font-medium text-muted-foreground mb-1">
@@ -564,12 +563,13 @@ export default function ProfilePage() {
                 <Card className="bg-card border-border rounded-xl shadow">
                   <CardHeader className="flex flex-row items-center space-y-0 pb-4">
                     <Bell className="h-5 w-5 text-muted-foreground mr-2" />
-                    <CardTitle>Notifications</CardTitle>
+                    <CardTitle className="text-foreground">Notifications</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-6">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="font-medium">Medication Reminders</p>
+                       <p className="text-muted-foreground text-sm">
+Medication Reminders</p>
                         <p className="text-muted-foreground text-sm">Get notified to take your medications</p>
                       </div>
                       <Switch
@@ -580,7 +580,8 @@ export default function ProfilePage() {
                     </div>
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="font-medium">Appointment Reminders</p>
+                       <p className="text-muted-foreground text-sm">
+Appointment Reminders</p>
                         <p className="text-muted-foreground text-sm">Reminders for upcoming medical appointments</p>
                       </div>
                       <Switch
@@ -591,7 +592,8 @@ export default function ProfilePage() {
                     </div>
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="font-medium">Health Tips</p>
+                       <p className="text-muted-foreground text-sm">
+Health Tips</p>
                         <p className="text-muted-foreground text-sm">General health tips and wellness advice</p>
                       </div>
                       <Switch
@@ -602,7 +604,8 @@ export default function ProfilePage() {
                     </div>
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="font-medium">Email Notifications</p>
+                       <p className="text-muted-foreground text-sm">
+Email Notifications</p>
                         <p className="text-muted-foreground text-sm">Receive notifications via email</p>
                       </div>
                       <Switch
@@ -613,7 +616,8 @@ export default function ProfilePage() {
                     </div>
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="font-medium">Push Notifications</p>
+                       <p className="text-muted-foreground text-sm">
+Push Notifications</p>
                         <p className="text-muted-foreground text-sm">Receive push notifications on your device</p>
                       </div>
                       <Switch
@@ -629,12 +633,12 @@ export default function ProfilePage() {
                 <Card className="bg-card border-border rounded-xl shadow">
                   <CardHeader className="flex flex-row items-center space-y-0 pb-4">
                     <Shield className="h-5 w-5 text-muted-foreground mr-2" />
-                    <CardTitle>Privacy & Security</CardTitle>
-                  </CardHeader>
+<CardTitle className="text-foreground">Privacy & Security</CardTitle>                  </CardHeader>
                   <CardContent className="space-y-6">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="font-medium">Share Data for Research</p>
+                       <p className="text-muted-foreground text-sm">
+Share Data for Research</p>
                         <p className="text-muted-foreground text-sm">Help improve healthcare by sharing anonymized data</p>
                       </div>
                       <Switch
@@ -645,7 +649,8 @@ export default function ProfilePage() {
                     </div>
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="font-medium">Save Conversations</p>
+                       <p className="text-muted-foreground text-sm">
+Save Conversations</p>
                         <p className="text-muted-foreground text-sm">Keep chat history for future reference</p>
                       </div>
                       <Switch
@@ -661,7 +666,7 @@ export default function ProfilePage() {
                 <Card className="bg-card border-border rounded-xl shadow">
                   <CardHeader className="flex flex-row items-center space-y-0 pb-4">
                     <Database className="h-5 w-5 text-muted-foreground mr-2" />
-                    <CardTitle>Data Management</CardTitle>
+<CardTitle className="text-foreground">Data Management</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-4">
@@ -682,7 +687,7 @@ export default function ProfilePage() {
                         🗑️ Clear All Data
                       </Button>
                     </div>
-                    <p className="text-muted-foreground text-sm">
+                    <p className="text-muted-foreground ">
                       Export your data to keep a backup, or clear all your data to start fresh.
                     </p>
                   </CardContent>

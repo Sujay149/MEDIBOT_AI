@@ -275,9 +275,10 @@ export default function HistoryPage() {
                         <div className="flex flex-col space-y-3 xs:space-y-4">
                           <div className="flex items-center justify-between">
                             <div className="flex items-center space-x-3 xs:space-x-4 min-w-0">
-                              <h3 className="font-semibold text-base xs:text-lg truncate max-w-[55%] xs:max-w-[65%]">
-                                {session.title || "Untitled"}
-                              </h3>
+                              <h3 className="font-semibold text-base xs:text-lg truncate max-w-[55%] xs:max-w-[65%] text-foreground">
+  {session.title || "Untitled"}
+</h3>
+
                               <Badge className="bg-purple-600 text-white font-medium px-2 xs:px-2.5 py-0.5 text-xs xs:text-sm shrink-0">
                                 {session.messages.length} msg
                               </Badge>

@@ -556,7 +556,7 @@ export default function MedicationsPage() {
                       <CardHeader className="pb-3">
                         <div className="flex items-start justify-between">
                           <div>
-                            <CardTitle className="text-lg sm:text-xl flex items-center gap-2">
+<CardTitle className="text-lg sm:text-xl flex items-center gap-2 text-foreground">
                               {medication.name}
                               {medication.enableWhatsApp && (
                                 <Badge variant="secondary" className="bg-green-600 text-white">

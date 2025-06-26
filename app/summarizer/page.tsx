@@ -200,10 +200,11 @@ export default function SummarizerPage() {
                 {/* Input Section */}
                 <Card className="bg-card border-border rounded-xl shadow">
                   <CardHeader>
-                    <CardTitle className="flex items-center space-x-2 text-lg">
-                      <FileText className="h-5 w-5 text-muted-foreground" />
-                      <span>Input Medical Information</span>
-                    </CardTitle>
+                   <CardTitle className="flex items-center space-x-2 text-lg text-white">
+  <FileText className="h-5 w-5 text-muted-foreground" />
+  <span>Input Medical Information</span>
+</CardTitle>
+
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div>

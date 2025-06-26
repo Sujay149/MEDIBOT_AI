@@ -17,7 +17,8 @@ import {
   Moon,
   Sun,
   LogOut,
-  Calendar
+  Calendar,
+  X,
 } from "lucide-react"
 import { useAuth } from "@/hooks/useAuth"
 import { cn } from "@/lib/utils"
@@ -27,7 +28,7 @@ interface SidebarProps {
   onClose?: () => void
 }
 
-export function Sidebar({ isOpen = true }: SidebarProps) {
+export function Sidebar({ isOpen = true, onClose }: SidebarProps) {
   const pathname = usePathname()
   const { user, userProfile, logout } = useAuth()
 
@@ -62,16 +63,25 @@ export function Sidebar({ isOpen = true }: SidebarProps) {
 
   return (
     <>
-      {isOpen && <div className="fixed inset-0 bg-black/50 z-40 lg:hidden" />}
+      {/* Overlay with click outside close */}
+      {isOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+          onClick={onClose}
+        />
+      )}
 
+      {/* Sidebar */}
       <div
         className={cn(
           "fixed inset-y-0 left-0 z-50 w-80 bg-sidebar transition-transform duration-300 ease-in-out border-r border-sidebar-border",
           isOpen ? "translate-x-0" : "-translate-x-full",
-          "lg:translate-x-0 lg:static lg:inset-0",
+          "lg:translate-x-0 lg:static lg:inset-0"
         )}
+        onClick={(e) => e.stopPropagation()} // prevent closing when clicking inside
       >
         <div className="flex flex-col h-full p-4">
+          {/* Header with logo and close button (mobile) */}
           <div className="flex items-center justify-between mb-8">
             <div className="flex items-center space-x-3">
               <div className="w-8 h-8 relative">
@@ -79,8 +89,17 @@ export function Sidebar({ isOpen = true }: SidebarProps) {
               </div>
               <span className="text-foreground font-semibold text-lg">Medibot</span>
             </div>
+            {/* Close button visible only on mobile */}
+            <button
+              onClick={onClose}
+              className="lg:hidden text-muted-foreground hover:text-foreground"
+              aria-label="Close sidebar"
+            >
+              <X className="h-6 w-6" />
+            </button>
           </div>
 
+          {/* Profile section */}
           <div className="bg-card rounded-xl p-4 mb-6 border border-border">
             <div className="flex items-center space-x-3">
               <Avatar className="w-12 h-12">
@@ -101,6 +120,7 @@ export function Sidebar({ isOpen = true }: SidebarProps) {
             </div>
           </div>
 
+          {/* Navigation */}
           <nav className="flex-1 space-y-2">
             {menuItems.map((item) => {
               const isActive = pathname === item.href
@@ -124,6 +144,7 @@ export function Sidebar({ isOpen = true }: SidebarProps) {
             })}
           </nav>
 
+          {/* Footer actions */}
           <div className="mt-auto space-y-3">
             {mounted && (
               <Button
