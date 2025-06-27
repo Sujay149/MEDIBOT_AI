@@ -1,7 +1,6 @@
 {
-  "name": "MEDIBOT_REM",
-  "short_name": "MEDIBOT",
-  "description": "Your Medical Reminder and Health Assistant",
+  "name": "MEDIBOT",
+  "short_name": "Medibot",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",

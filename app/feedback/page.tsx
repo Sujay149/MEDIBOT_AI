@@ -70,7 +70,7 @@ export default function FeedbackPage() {
               <div className="max-w-xl mx-auto bg-card border border-border p-6 rounded-xl shadow">
                 <h2 className="text-xl font-bold mb-4">Send Us Your Feedback</h2>
 
-                <form onSubmit={handleSubmit} className="space-y-4">
+                <form onSubmit={handleSubmit} className="space-y-5" aria-live="polite">
                   <div>
                     <label htmlFor="email" className="block text-sm font-medium text-muted-foreground mb-1">
                       Your Email
@@ -81,7 +81,7 @@ export default function FeedbackPage() {
                       placeholder="you@example.com"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      className="w-full px-3 py-2 rounded-md bg-muted border border-border text-foreground focus:outline-none focus:ring-2 focus:ring-purple-600"
+                      className="w-full px-3 py-2 rounded-md bg-muted border border-border text-foreground focus:outline-none focus:ring-2 focus:ring-purple-600 transition"
                       required
                     />
                   </div>
@@ -96,7 +96,7 @@ export default function FeedbackPage() {
                       placeholder="Your message..."
                       value={message}
                       onChange={(e) => setMessage(e.target.value)}
-                      className="w-full px-3 py-2 rounded-md bg-muted border border-border text-foreground focus:outline-none focus:ring-2 focus:ring-purple-600"
+                      className="w-full px-3 py-2 rounded-md bg-muted border border-border text-foreground focus:outline-none focus:ring-2 focus:ring-purple-600 transition"
                       required
                     />
                   </div>
@@ -109,10 +109,10 @@ export default function FeedbackPage() {
                           key={star}
                           type="button"
                           onClick={() => setRating(star)}
-                          className={`text-2xl transition-transform hover:scale-110 ${
+                          className={`text-2xl transition-transform hover:scale-110 focus:outline-none ${
                             rating >= star ? "text-yellow-400" : "text-muted-foreground"
                           }`}
-                          aria-label={`${star} star`}
+                          aria-label={`Rate ${star} star${star > 1 ? "s" : ""}`}
                         >
                           ★
                         </button>
@@ -123,7 +123,7 @@ export default function FeedbackPage() {
                   <Button
                     type="submit"
                     disabled={loading}
-                    className="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold"
+                    className="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold transition"
                   >
                     {loading ? "Sending..." : "Submit Feedback"}
                   </Button>
@@ -132,7 +132,7 @@ export default function FeedbackPage() {
                     <p className="text-muted-foreground text-sm mb-2">
                       Need help or want to share something directly?
                     </p>
-                    
+
                     <a
                       href="https://wa.me/919346491221"
                       target="_blank"
