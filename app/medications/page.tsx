@@ -61,11 +61,14 @@ export default function MedicationsPage() {
         return;
       }
 
-      const response = await fetch("/api/send-notification", {
+      const response = await fetch("https://fcm.googleapis.com/fcm/send", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `key=YOUR_FCM_SERVER_KEY`, // 🔁 Replace with your FCM server key
+        },
         body: JSON.stringify({
-          token: fcmToken,
+          to: fcmToken,
           notification: {
             title,
             body,
@@ -89,11 +92,7 @@ export default function MedicationsPage() {
       const response = await fetch("/api/send-email", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          to: email,
-          subject,
-          message: body,
-        }),
+        body: JSON.stringify({ to: email, subject, message: body }),
       });
 
       const result = await response.json();
@@ -240,7 +239,7 @@ export default function MedicationsPage() {
       const notifications = [
         sendMobileNotification(user.uid, "Medication Saved", message),
         user.email ? sendEmailNotification(user.email, "Medication Saved", message) : Promise.resolve(),
-        sendMedicationReminder(user.uid, medicationData.name, medicationData.enableWhatsApp ? medicationData.phoneNumber : undefined, medicationData.enableWhatsApp),
+        sendMedicationReminder(user!.uid, medicationData.name, medicationData.enableWhatsApp ? medicationData.phoneNumber : undefined, medicationData.enableWhatsApp),
       ];
       await Promise.all(notifications);
 
@@ -347,9 +346,9 @@ export default function MedicationsPage() {
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => setSidebarOpen(true)}
+                onClick={() => setSidebarOpen(!sidebarOpen)}
                 className="text-muted-foreground hover:text-foreground lg:hidden h-10 w-10"
-                aria-label="Open sidebar"
+                aria-label="Toggle sidebar"
               >
                 <Menu className="h-5 w-5" />
               </Button>
@@ -556,7 +555,7 @@ export default function MedicationsPage() {
                       <CardHeader className="pb-3">
                         <div className="flex items-start justify-between">
                           <div>
-<CardTitle className="text-lg sm:text-xl flex items-center gap-2 text-foreground">
+                            <CardTitle className="text-lg sm:text-xl flex items-center gap-2 text-foreground">
                               {medication.name}
                               {medication.enableWhatsApp && (
                                 <Badge variant="secondary" className="bg-green-600 text-white">
