@@ -57,14 +57,18 @@ export default function HomePage() {
 
         {/* Buttons */}
         <div className="space-y-2">
-          <Link href="/auth/signup" className="block">
-            <Button className={blueButton}>Sign Up</Button>
-          </Link>
-          <Link href="/auth/signin" className="block">
-            <Button className={blueButton}>Sign In</Button>
-          </Link>
-         
-        </div>
+  <Link href="/auth/signup" className="block">
+    <Button className="w-full h-12 text-white bg-gradient-to-r from-purple-500 to-blue-500 rounded-full hover:opacity-90 transition-all duration-200">
+      Sign Up
+    </Button>
+  </Link>
+  <Link href="/auth/signin" className="block">
+    <Button className="w-full h-12 text-white bg-gradient-to-r from-purple-500 to-blue-500 rounded-full hover:opacity-90 transition-all duration-200">
+      Sign In
+    </Button>
+  </Link>
+</div>
+
 
         {/* Footer */}
         <footer className="text-center text-slate-400 text-xs pt-4 border-t border-white/10">
