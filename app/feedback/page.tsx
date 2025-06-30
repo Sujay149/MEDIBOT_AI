@@ -18,22 +18,23 @@ export default function FeedbackPage() {
     setLoading(true)
 
     try {
-      const res = await fetch("/api/send-feedback", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ email, message, rating }),
-      })
+   const res = await fetch("/api/send-feedback", {
+     method: "POST",
+     headers: {
+       "Content-Type": "application/json"
+     },
+     body: JSON.stringify({ email, message, rating })
+   })
+     if (res.ok) {
+  toast.success("Feedback sent successfully!")
+  setEmail("")
+  setMessage("")
+  setRating(0)
+} else {
+  const errorData = await res.json().catch(() => null)
+  toast.error(errorData?.error || "Failed to send feedback.")
+}
 
-      if (res.ok) {
-        toast.success("Feedback sent successfully!")
-        setEmail("")
-        setMessage("")
-        setRating(0)
-      } else {
-        toast.error("Failed to send feedback.")
-      }
     } catch (err) {
       console.error(err)
       toast.error("Error sending feedback.")

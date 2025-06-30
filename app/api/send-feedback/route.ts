@@ -37,7 +37,7 @@ export async function POST(req: Request) {
     })
 
     return NextResponse.json({ success: true })
-  } catch (error: any) {
+  } catch (error) {
     console.error("Email error:", error)
     return NextResponse.json({ error: "Failed to send feedback" }, { status: 500 })
   }
