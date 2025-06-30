@@ -29,16 +29,19 @@ export function AuthGuard({ children, requireAuth = true }: AuthGuardProps) {
     }
   }, [user, loading, requireAuth, router, pathname])
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-8 h-8 border-4 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-slate-400">Loading...</p>
-        </div>
+if (loading) {
+  return (
+    <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+      <div className="space-y-4 p-6 w-full max-w-md animate-pulse">
+        <div className="h-6 bg-slate-800 rounded w-1/3 mx-auto" />
+        <div className="h-4 bg-slate-800 rounded w-full" />
+        <div className="h-4 bg-slate-800 rounded w-5/6" />
+        <div className="h-4 bg-slate-800 rounded w-2/3" />
       </div>
-    )
-  }
+    </div>
+  )
+}
+
 
   if (requireAuth && !user) {
     return null

@@ -1,7 +1,7 @@
 {
   "name": "MEDIBOT",
   "short_name": "Medibot",
-  "start_url": "/",
+  "start_url": "/https://medibot-ai-two.vercel.app/",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#0f172a",

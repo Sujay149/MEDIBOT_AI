@@ -255,15 +255,18 @@ export default function HistoryPage() {
                 </Card>
               </div>
 
-              {loading ? (
-                <div className="text-center py-8 xs:py-10">
-                  <div className="w-6 h-6 xs:w-8 xs:h-8 border-4 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto mb-3 xs:mb-4">
-                    <span className="sr-only">Loading...</span>
-                  </div>
-                  <p className="text-muted-foreground text-sm xs:text-base">
-                    Loading chat history...
-                  </p>
-                </div>
+             {loading ? (
+  <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-3 gap-4 xs:gap-5">
+    {Array.from({ length: 6 }).map((_, index) => (
+      <div key={index} className="bg-muted rounded-lg p-4 xs:p-5 animate-pulse shadow">
+        <div className="w-10 h-10 bg-gray-300 rounded-full mb-4 mx-auto" />
+        <div className="h-6 bg-gray-300 rounded w-1/3 mx-auto mb-2" />
+        <div className="h-4 bg-gray-300 rounded w-2/3 mx-auto" />
+      </div>
+    ))}
+  </div>
+
+
               ) : filteredSessions.length > 0 ? (
                 <div className="space-y-4 xs:space-y-5">
                   {filteredSessions.map((session) => (
