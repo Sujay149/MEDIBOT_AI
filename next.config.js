@@ -1,9 +1,8 @@
-// next.config.js
+/** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: 'export',
-  images: {
-    unoptimized: true,
-  },
-};
+  reactStrictMode: true,
+  // REMOVE or COMMENT OUT this line if present:
+  // output: 'export',
+}
 
-module.exports = nextConfig;
+export default nextConfig
