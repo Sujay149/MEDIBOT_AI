@@ -915,198 +915,198 @@ export default function ChatPage() {
         {user && (
           <>
             <Dialog open={prescriptionDialogOpen} onOpenChange={setPrescriptionDialogOpen}>
-              <DialogContent className="bg-card border-border text-foreground max-w-[90vw] sm:max-w-2xl mx-auto max-h-[90vh] sm:max-h-[80vh] overflow-y-auto sm:rounded-xl p-4 sm:p-6 shadow">
-                <DialogHeader>
-                  <DialogTitle className="flex items-center space-x-2 text-lg">
-                    <Camera className="h-5 w-5 text-muted-foreground" />
-                    <span>Prescription Analysis</span>
-                  </DialogTitle>
-                </DialogHeader>
+  <DialogContent className="bg-card border-border text-foreground max-w-[90vw] sm:max-w-2xl mx-auto max-h-[90vh] sm:max-h-[80vh] overflow-y-auto sm:rounded-xl p-4 sm:p-6 shadow">
+    <DialogHeader>
+      <DialogTitle className="flex items-center space-x-2 text-lg">
+        <Camera className="h-5 w-5 text-muted-foreground" />
+        <span>Prescription Analysis</span>
+      </DialogTitle>
+    </DialogHeader>
 
-                {!analysisResult ? (
-                  <div className="space-y-3 sm:space-y-4">
-                    <p className="text-muted-foreground text-xs sm:text-sm">
-                      Upload a photo of your prescription or tablet strip for AI-powered analysis.
-                    </p>
-                    <Select value={imageType} onValueChange={(value) => setImageType(value as "Prescription Receipt" | "Tablet Strip")}>
-                      <SelectTrigger className="w-full bg-muted border-border text-foreground text-sm h-10">
-                        <SelectValue placeholder="Image Type" />
-                      </SelectTrigger>
-                      <SelectContent className="bg-card border-border text-foreground text-sm shadow-lg">
-                        <SelectItem value="Prescription Receipt">Prescription Receipt</SelectItem>
-                        <SelectItem value="Tablet Strip">Tablet Strip</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <div className="border-2 border-dashed border-border rounded-xl p-6 sm:p-8 text-center">
-                      {analyzingPrescription ? (
-                        <div className="space-y-3 sm:space-y-4">
-                          <div className="w-10 h-10 sm:w-12 sm:h-12 border-4 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
-                          <p className="text-muted-foreground text-xs sm:text-sm">Analyzing {imageType.toLowerCase()}...</p>
-                        </div>
-                      ) : (
-                        <>
-                          <Camera className="h-10 w-10 sm:h-12 sm:w-12 text-muted-foreground mx-auto mb-3 sm:mb-4" />
-                          <p className="text-muted-foreground text-xs sm:text-sm mb-3 sm:mb-4">Upload {imageType.toLowerCase()} image</p>
-                          <Button
-                            onClick={handleFileUpload}
-                            className="bg-purple-600 hover:bg-purple-700 text-white text-xs sm:text-sm"
-                          >
-                            <Upload className="mr-1 h-3 w-3 sm:h-4 sm:w-4" />
-                            Choose File
-                          </Button>
-                        </>
-                      )}
+    {!analysisResult ? (
+      <div className="space-y-3 sm:space-y-4">
+        <p className="text-muted-foreground text-xs sm:text-sm">
+          Upload a photo of your prescription or tablet strip for AI-powered analysis.
+        </p>
+        <Select value={imageType} onValueChange={(value) => setImageType(value as "Prescription Receipt" | "Tablet Strip")}>
+          <SelectTrigger className="w-full bg-muted border-border text-foreground text-sm h-10">
+            <SelectValue placeholder="Image Type" />
+          </SelectTrigger>
+          <SelectContent className="bg-card border-border text-foreground text-sm shadow-lg">
+            <SelectItem value="Prescription Receipt">Prescription Receipt</SelectItem>
+            <SelectItem value="Tablet Strip">Tablet Strip</SelectItem>
+          </SelectContent>
+        </Select>
+        <div className="border-2 border-dashed border-border rounded-xl p-6 sm:p-8 text-center bg-muted">
+          {analyzingPrescription ? (
+            <div className="space-y-3 sm:space-y-4">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 border-4 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
+              <p className="text-muted-foreground text-xs sm:text-sm">Analyzing {imageType.toLowerCase()}...</p>
+            </div>
+          ) : (
+            <>
+              <Camera className="h-10 w-10 sm:h-12 sm:w-12 text-muted-foreground mx-auto mb-3 sm:mb-4" />
+              <p className="text-muted-foreground text-xs sm:text-sm mb-3 sm:mb-4">Upload {imageType.toLowerCase()} image</p>
+              <Button
+                onClick={handleFileUpload}
+                className="bg-purple-600 hover:bg-purple-700 text-white text-xs sm:text-sm"
+              >
+                <Upload className="mr-1 h-3 w-3 sm:h-4 sm:w-4" />
+                Choose File
+              </Button>
+            </>
+          )}
+        </div>
+
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) {
+              setAnalyzingPrescription(true);
+              analyzePrescription(file, imageType)
+                .then((analysis) => {
+                  setAnalysisResult(analysis);
+                  toast.success(`${imageType} analyzed successfully!`);
+                })
+                .catch((error) => {
+                  console.error("Error analyzing prescription:", error);
+                  toast.error(`Failed to analyze ${imageType.toLowerCase()}`);
+                })
+                .finally(() => {
+                  setAnalyzingPrescription(false);
+                  if (fileInputRef.current) fileInputRef.current.value = "";
+                });
+            }
+          }}
+          className="hidden"
+        />
+
+        <p className="text-xs text-muted-foreground">
+          Supported formats: JPG, PNG, HEIC. This feature analyzes {imageType.toLowerCase()} information for educational purposes only.
+        </p>
+      </div>
+    ) : (
+      <div className="space-y-4 sm:space-y-6">
+        <Card className="bg-card border-border rounded-xl shadow">
+         <CardHeader>
+  <CardTitle className="flex items-center space-x-2 text-lg">
+    <FileText className="h-5 w-5 text-muted-foreground" />
+    <span className="text-purple-600">Prescription Receipt Analysis Results</span>
+  </CardTitle>
+</CardHeader>
+          <CardContent className="space-y-3 sm:space-y-4">
+            <div className="grid grid-cols-1 gap-3 sm:gap-4">
+              <div>
+                <h4 className="font-semibold text-sm mb-1 sm:mb-2 text-foreground">Detected Medications</h4>
+                <div className="space-y-1 sm:space-y-2 flex flex-wrap gap-1">
+                  {analysisResult.medications.map((med, index) => (
+                    <Badge key={index} className="bg-purple-600 text-white text-xs sm:text-sm mr-1 mb-1">
+                      <Pill className="mr-1 h-3 w-3 sm:h-3 sm:w-3" />
+                      {med}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <h4 className="font-semibold text-sm mb-1 sm:mb-2 text-foreground">Dosage Information</h4>
+                <div className="space-y-1 sm:space-y-2 flex flex-wrap gap-1">
+                  {analysisResult.dosages.map((dosage, index) => (
+                    <Badge
+                      key={index}
+                      variant="secondary"
+                      className="bg-muted text-muted-foreground text-xs sm:text-sm mr-1 mb-1"
+                    >
+                      {dosage}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <h4 className="font-semibold text-sm mb-1 sm:mb-2 text-foreground">Instructions</h4>
+              <p className="text-muted-foreground text-xs sm:text-sm bg-muted p-2 sm:p-3 rounded-lg">
+                {analysisResult.instructions}
+              </p>
+            </div>
+
+            {analysisResult.patientName && (
+              <div>
+                <h4 className="font-semibold text-sm mb-1 sm:mb-2 text-foreground">Patient Name</h4>
+                <p className="text-muted-foreground text-xs sm:text-sm bg-muted p-2 sm:p-3 rounded-lg">
+                  {analysisResult.patientName}
+                </p>
+              </div>
+            )}
+
+            {analysisResult.doctorName && (
+              <div>
+                <h4 className="font-semibold text-sm mb-1 sm:mb-2 text-foreground">Doctor Name</h4>
+                <p className="text-muted-foreground text-xs sm:text-sm bg-muted p-2 sm:p-3 rounded-lg">
+                  {analysisResult.doctorName}
+                </p>
+              </div>
+            )}
+
+            {analysisResult.hospital && (
+              <div>
+                <h4 className="font-semibold text-sm mb-1 sm:mb-2 text-foreground">Hospital</h4>
+                <p className="text-muted-foreground text-xs sm:text-sm bg-muted p-2 sm:p-3 rounded-lg">
+                  {analysisResult.hospital}
+                </p>
+              </div>
+            )}
+
+            {analysisResult.warnings?.length > 0 && (
+              <div>
+                <h4 className="font-semibold text-sm mb-1 sm:mb-2 flex items-center text-foreground">
+                  <AlertCircle className="mr-1 h-4 w-4 sm:h-5 sm:w-5 text-yellow-500" />
+                  <span>Warnings & Precautions</span>
+                </h4>
+                <div className="space-y-1 sm:space-y-2">
+                  {analysisResult.warnings.map((warning, index) => (
+                    <div key={index} className="bg-yellow-900/20 border border-yellow-700 p-2 sm:p-3 rounded-lg">
+                      <p className="text-yellow-300 text-xs sm:text-sm">{warning}</p>
                     </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept="image/*"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) {
-                          setAnalyzingPrescription(true);
-                          analyzePrescription(file, imageType)
-                            .then((analysis) => {
-                              setAnalysisResult(analysis);
-                              toast.success(`${imageType} analyzed successfully!`);
-                            })
-                            .catch((error) => {
-                              console.error("Error analyzing prescription:", error);
-                              toast.error(`Failed to analyze ${imageType.toLowerCase()}`);
-                            })
-                            .finally(() => {
-                              setAnalyzingPrescription(false);
-                              if (fileInputRef.current) fileInputRef.current.value = "";
-                            });
-                        }
-                      }}
-                      className="hidden"
-                    />
+            <div className="bg-blue-900/20 border border-blue-700 p-3 sm:p-4 rounded-lg">
+              <p className="text-blue-300 text-sm">
+                <strong>Important:</strong> This analysis is for informational purposes only. Always follow your doctor's instructions and consult your pharmacist.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
 
-                    <p className="text-xs text-muted-foreground">
-                      Supported formats: JPG, PNG, HEIC. This feature analyzes {imageType.toLowerCase()} information for educational purposes only.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-4 sm:space-y-6">
-                    <Card className="bg-card border-border rounded-xl shadow">
-                      <CardHeader>
-                        <CardTitle className="flex items-center space-x-2 text-lg">
-                          <FileText className="h-5 w-5 text-muted-foreground" />
-                          <span>{imageType} Analysis Results</span>
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="space-y-3 sm:space-y-4">
-                        <div className="grid grid-cols-1 gap-3 sm:gap-4">
-                          <div>
-                            <h4 className="font-semibold text-sm mb-1 sm:mb-2">Detected Medications</h4>
-                            <div className="space-y-1 sm:space-y-2 flex flex-wrap gap-1">
-                              {analysisResult.medications.map((med, index) => (
-                                <Badge key={index} className="bg-purple-600 text-white text-xs sm:text-sm mr-1 mb-1">
-                                  <Pill className="mr-1 h-3 w-3 sm:h-3 sm:w-3" />
-                                  {med}
-                                </Badge>
-                              ))}
-                            </div>
-                          </div>
-
-                          <div>
-                            <h4 className="font-semibold text-sm mb-1 sm:mb-2">Dosage Information</h4>
-                            <div className="space-y-1 sm:space-y-2 flex flex-wrap gap-1">
-                              {analysisResult.dosages.map((dosage, index) => (
-                                <Badge
-                                  key={index}
-                                  variant="secondary"
-                                  className="bg-muted text-muted-foreground text-xs sm:text-sm mr-1 mb-1"
-                                >
-                                  {dosage}
-                                </Badge>
-                              ))}
-                            </div>
-                          </div>
-                        </div>
-
-                        <div>
-                          <h4 className="font-semibold text-sm mb-1 sm:mb-2">Instructions</h4>
-                          <p className="text-muted-foreground text-xs sm:text-sm bg-muted p-2 sm:p-3 rounded-lg">
-                            {analysisResult.instructions}
-                          </p>
-                        </div>
-
-                        {analysisResult.patientName && (
-                          <div>
-                            <h4 className="font-semibold text-sm mb-1 sm:mb-2">Patient Name</h4>
-                            <p className="text-muted-foreground text-xs sm:text-sm bg-muted p-2 sm:p-3 rounded-lg">
-                              {analysisResult.patientName}
-                            </p>
-                          </div>
-                        )}
-
-                        {analysisResult.doctorName && (
-                          <div>
-                            <h4 className="font-semibold text-sm mb-1 sm:mb-2">Doctor Name</h4>
-                            <p className="text-muted-foreground text-xs sm:text-sm bg-muted p-2 sm:p-3 rounded-lg">
-                              {analysisResult.doctorName}
-                            </p>
-                          </div>
-                        )}
-
-                        {analysisResult.hospital && (
-                          <div>
-                            <h4 className="font-semibold text-sm mb-1 sm:mb-2">Hospital</h4>
-                            <p className="text-muted-foreground text-xs sm:text-sm bg-muted p-2 sm:p-3 rounded-lg">
-                              {analysisResult.hospital}
-                            </p>
-                          </div>
-                        )}
-
-                        {analysisResult.warnings?.length > 0 && (
-                          <div>
-                            <h4 className="font-semibold text-sm mb-1 sm:mb-2 flex items-center">
-                              <AlertCircle className="mr-1 h-4 w-4 sm:h-5 sm:w-5 text-yellow-500" />
-                              <span>Warnings & Precautions</span>
-                            </h4>
-                            <div className="space-y-1 sm:space-y-2">
-                              {analysisResult.warnings.map((warning, index) => (
-                                <div key={index} className="bg-yellow-900/20 border border-yellow-700 p-2 sm:p-3 rounded-lg">
-                                  <p className="text-yellow-300 text-xs sm:text-sm">{warning}</p>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
-                        <div className="bg-blue-900/20 border border-blue-700 p-3 sm:p-4 rounded-lg">
-                          <p className="text-blue-300 text-sm">
-                            <strong>Important:</strong> This analysis is for informational purposes only. Always follow your doctor's instructions and consult your pharmacist.
-                          </p>
-                        </div>
-                      </CardContent>
-                    </Card>
-
-                    <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3">
-                      <Button
-                        onClick={() => {
-                          setAnalysisResult(null);
-                          setPrescriptionDialogOpen(false);
-                        }}
-                        variant="outline"
-                        className="flex-1 bg-muted border-border text-foreground hover:bg-purple-600 hover:text-white text-sm"
-                      >
-                        Close
-                      </Button>
-                      <Button
-                        onClick={() => setAnalysisResult(null)}
-                        className="flex-1 bg-purple-600 hover:bg-purple-700 text-white text-sm"
-                      >
-                        Analyze Another
-                      </Button>
-                    </div>
-                  </div>
-                )}
-              </DialogContent>
-            </Dialog>
+        <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3">
+          <Button
+            onClick={() => {
+              setAnalysisResult(null);
+              setPrescriptionDialogOpen(false);
+            }}
+            variant="outline"
+            className="flex-1 bg-muted border-border text-foreground hover:bg-purple-600 hover:text-white text-sm"
+          >
+            Close
+          </Button>
+          <Button
+            onClick={() => setAnalysisResult(null)}
+            className="flex-1 bg-purple-600 hover:bg-purple-700 text-white text-sm"
+          >
+            Analyze Another
+          </Button>
+        </div>
+      </div>
+    )}
+  </DialogContent>
+</Dialog>
 
             <Dialog open={historyDialogOpen} onOpenChange={setHistoryDialogOpen}>
               <DialogContent className="bg-card border-border text-foreground max-w-md mx-auto p-6 sm:p-6 rounded-xl shadow">
