@@ -49,9 +49,11 @@ export interface UserProfile {
 export interface ChatMessage {
   id?: string
   userId: string
+  image?: string;
   message: string
   response: string
   timestamp: Timestamp | Date
+  
   type: "chat" | "summarizer"
 }
 
