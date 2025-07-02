@@ -1,4 +1,3 @@
-
 "use client";
 
 import Link from "next/link";
@@ -6,7 +5,6 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
-
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -17,10 +15,9 @@ import {
   User,
   Moon,
   Sun,
-  X,
-  Plus,
   LogOut,
   Calendar,
+  X,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
@@ -33,7 +30,6 @@ interface SidebarProps {
 export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
   const pathname = usePathname();
   const { user, userProfile, logout } = useAuth();
-
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(isOpen);
@@ -55,7 +51,7 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
   const handleSignOut = async () => {
     try {
       await logout();
-      setSidebarOpen(false); // Close sidebar after logout
+      setSidebarOpen(false);
       if (onClose) onClose();
     } catch (error) {
       console.error("Error signing out:", error);
@@ -72,18 +68,17 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
 
   const handleOverlayClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (e.target === e.currentTarget) {
-      setSidebarOpen(false); // Explicitly close on overlay click
+      setSidebarOpen(false);
     }
   };
 
   return (
     <>
-      {sidebarOpen && !isOpen && (
+      {sidebarOpen && (
         <div
           className="fixed inset-0 bg-black/50 z-40 lg:hidden"
           onClick={handleOverlayClick}
           onTouchStart={(e) => {
-            // Only close if touch is on overlay, similar to mouse
             if (e.target === e.currentTarget) {
               setSidebarOpen(false);
             }
@@ -92,7 +87,7 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
       )}
 
       <div className="lg:flex lg:items-start">
-        {/* Toggle Button for Large Screens */}
+        {/* Hamburger Menu Button - Always visible on mobile */}
         <Button
           variant="ghost"
           size="icon"
@@ -120,8 +115,8 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
         <div
           className={cn(
             "fixed inset-y-0 left-0 z-50 w-80 bg-card transition-transform duration-300 ease-in-out border-r border-border",
-            sidebarOpen || isOpen ? "translate-x-0" : "-translate-x-full",
-            "lg:translate-x-0 lg:static lg:inset-0 lg:flex lg:h-screen lg:flex-col",
+            sidebarOpen ? "translate-x-0" : "-translate-x-full",
+            "lg:translate-x-0 lg:static lg:inset-0 lg:flex lg:h-screen lg:flex-col"
           )}
         >
           <div className="flex flex-col h-full p-4">
@@ -132,24 +127,15 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
                 </div>
                 <span className="text-foreground font-semibold text-lg">Medibot</span>
               </div>
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center space-x-2 lg:hidden">
                 <Button
                   variant="ghost"
                   size="icon"
+                  onClick={toggleSidebar}
                   className="text-muted-foreground hover:text-foreground hover:bg-muted"
                 >
-                  <Plus className="h-4 w-4" />
+                  <X className="h-4 w-4" />
                 </Button>
-                {(onClose || !isOpen) && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={toggleSidebar}
-                    className="text-muted-foreground hover:text-foreground hover:bg-muted"
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                )}
               </div>
             </div>
 
@@ -176,7 +162,6 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
             <nav className="flex-1 space-y-2">
               {menuItems.map((item) => {
                 const isActive = pathname === item.href;
-
                 return (
                   <Link key={item.href} href={item.href} legacyBehavior>
                     <a>
@@ -186,7 +171,7 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
                           "w-full justify-start text-left h-12 rounded-xl transition-all duration-200",
                           isActive
                             ? "bg-purple-600 text-white shadow"
-                            : "text-muted-foreground hover:text-foreground hover:bg-muted",
+                            : "text-muted-foreground hover:text-foreground hover:bg-muted"
                         )}
                       >
                         <item.icon className="mr-3 h-5 w-5" />

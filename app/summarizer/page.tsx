@@ -269,10 +269,10 @@ export default function SummarizerPage() {
                 <Card className="bg-card border-border rounded-xl shadow">
                   <CardHeader>
                     <CardTitle className="flex items-center justify-between text-lg">
-                      <div className="flex items-center space-x-2">
-                        <Sparkles className="h-5 w-5 text-muted-foreground" />
-                        <span>AI Summary</span>
-                      </div>
+                      <div className="flex items-center space-x-2 text-white">
+  <Sparkles className="h-5 w-5" />
+  <span>AI Summary</span>
+</div>
                       {summary && (
                         <div className="flex space-x-2">
                           <Button
