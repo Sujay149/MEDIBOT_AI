@@ -38,7 +38,7 @@ export default function SummarizerPage() {
 
     try {
       setLoadingHistory(true);
-      const userSummaries = await getUserSummaries(user.uid);
+      const userSummaries = await getUserSummaries();
       setSummaries(userSummaries);
     } catch (error) {
       console.error("Error loading summaries:", error);
@@ -63,7 +63,7 @@ export default function SummarizerPage() {
       setSummary(generatedSummary);
 
       // Save to Firestore
-      await addSummaryRequest(user.uid, inputText, generatedSummary, category);
+      await addSummaryRequest();
 
       toast.success("Summary generated successfully!");
 

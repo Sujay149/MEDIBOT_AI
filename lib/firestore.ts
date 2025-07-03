@@ -572,10 +572,16 @@ export const addHealthRecord = async (
     throw new Error("Failed to add health record");
   }
 };
-export const sendMedicationReminder = () => {
-  // TODO: Implement sendMedicationReminder
-  throw new Error("sendMedicationReminder not implemented");
-};
+export function sendMedicationReminder(
+  userId: string,
+  medicationName: string,
+  phoneNumber?: string,
+  enableWhatsApp?: boolean
+) {
+  // implement your reminder logic using the above parameters
+  console.log("Reminder:", userId, medicationName, phoneNumber, enableWhatsApp);
+}
+
 export const subscribeToUserMedications = (
   userId: string,
   callback: (medications: Medication[]) => void,

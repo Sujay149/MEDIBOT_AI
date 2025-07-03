@@ -252,7 +252,7 @@ export default function MedicationsPage() {
         user.email ? sendEmailNotification(user.email, "Medication Save Error", `Failed to save medication: ${errorMessage}`) : Promise.resolve(),
       ];
       if (formData.enableWhatsApp && formData.phoneNumber) {
-        notifications.push(sendMedicationReminder(user.uid, formData.name, formData.phoneNumber, true));
+        sendMedicationReminder(user.uid, formData.name, formData.phoneNumber, true);
       }
       await Promise.all(notifications);
       toast.error(`Failed to save medication: ${errorMessage}`);
@@ -273,7 +273,7 @@ export default function MedicationsPage() {
           user.email ? sendEmailNotification(user.email, "Medication Delete Error", `Failed to save medication: ${errorMessage}`) : Promise.resolve(),
         ];
         if (medication?.enableWhatsApp && medication.phoneNumber) {
-          notifications.push(sendMedicationReminder(user.uid, medication.name, medication.phoneNumber, true));
+          notifications.push(Promise.resolve(sendMedicationReminder(user.uid, medication.name, medication.phoneNumber, true)));
         }
         await Promise.all(notifications);
       }
@@ -327,7 +327,7 @@ export default function MedicationsPage() {
           user.email ? sendEmailNotification(user.email, "Test Reminder Error", `Failed to send test reminder for ${medication.name}: ${errorMessage}`) : Promise.resolve(),
         ];
         if (medication.enableWhatsApp && medication.phoneNumber) {
-          notifications.push(sendMedicationReminder(user.uid, medication.name, medication.phoneNumber, true));
+          notifications.push(Promise.resolve(sendMedicationReminder(user.uid, medication.name, medication.phoneNumber, true)));
         }
         await Promise.all(notifications);
       }
