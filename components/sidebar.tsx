@@ -210,23 +210,24 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
                   return (
                     <Link key={item.href} href={item.href} legacyBehavior>
                       <a>
-                        <Button
-                          variant="ghost"
-                          className={cn(
-                            "w-full justify-start text-left h-12 rounded-xl transition-all duration-200",
-                            "flex items-center",
-                            isActive
-                              ? "bg-purple-600 text-white shadow"
-                              : "text-muted-foreground hover:text-foreground hover:bg-muted",
-                            collapsed ? "justify-center" : "px-4"
-                          )}
-                          title={collapsed ? item.label : undefined}
-                        >
-                          <item.icon className="h-5 w-5 flex-shrink-0" />
-                          {!collapsed && (
-                            <span className="ml-3">{item.label}</span>
-                          )}
-                        </Button>
+                       
+<Button
+  variant="ghost"
+  className={cn(
+    "w-full justify-start text-left h-12 rounded-xl transition-all duration-200",
+    "flex items-center font-sans", // Added font-sans here (or your preferred font class)
+    isActive
+      ? "bg-purple-600 text-white shadow"
+      : "text-muted-foreground hover:text-foreground hover:bg-muted",
+    collapsed ? "justify-center" : "px-4"
+  )}
+  title={collapsed ? item.label : undefined}
+>
+  <item.icon className="h-5 w-5 flex-shrink-0" />
+  {!collapsed && (
+    <span className="ml-3 font-medium">{item.label}</span> // Added font-medium here
+  )}
+</Button>
                       </a>
                     </Link>
                   );
