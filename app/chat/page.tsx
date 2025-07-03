@@ -23,8 +23,24 @@ import {
 } from "@/lib/firestore";
 import { toast } from "sonner";
 import Link from "next/link";
+import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import { ThumbsDown, ThumbsUp, Copy, Edit, Menu, Plus, Camera, RotateCcw, Upload, Send, X, FileText, Pill, AlertCircle } from "lucide-react";
+import {
+  ThumbsDown,
+  ThumbsUp,
+  Copy,
+  Edit,
+  Menu,
+  Plus,
+  Camera,
+  RotateCcw,
+  Upload,
+  Send,
+  X,
+  FileText,
+  Pill,
+  AlertCircle,
+} from "lucide-react";
 
 interface PrescriptionAnalysis {
   medications: string[];
@@ -37,6 +53,14 @@ interface PrescriptionAnalysis {
 }
 
 export default function ChatPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center h-screen">Loading chat...</div>}>
+      <ChatContent />
+    </Suspense>
+  );
+}
+
+function ChatContent() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [message, setMessage] = useState("");
   const [currentSession, setCurrentSession] = useState<ChatSession | null>(null);
@@ -162,7 +186,7 @@ export default function ChatPage() {
       } else if (sessionToUse.title === "New Chat" && message.trim()) {
         const smartTitle = generateChatTitle(message);
         await updateChatSessionTitle(sessionToUse.id!, smartTitle);
-        setCurrentSession((prev) => prev ? { ...prev, title: smartTitle } : prev);
+        setCurrentSession((prev) => (prev ? { ...prev, title: smartTitle } : prev));
       }
 
       let botResponse = "";
@@ -259,7 +283,7 @@ export default function ChatPage() {
     const lowerMessage = firstMessage.toLowerCase().trim();
     if (lowerMessage.length === 0) return "General Discussion";
 
-    const words = lowerMessage.split(/\s+/).filter(word => word.length > 3);
+    const words = lowerMessage.split(/\s+/).filter((word) => word.length > 3);
     if (words.length === 0) return "General Discussion";
 
     const healthKeywords = [
@@ -278,12 +302,12 @@ export default function ChatPage() {
     ];
 
     for (const { keywords, title } of healthKeywords) {
-      if (keywords.some(keyword => lowerMessage.includes(keyword))) {
+      if (keywords.some((keyword) => lowerMessage.includes(keyword))) {
         return title;
       }
     }
 
-    const keyPhrase = words.slice(0, 2).map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(" ");
+    const keyPhrase = words.slice(0, 2).map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(" ");
     return `${keyPhrase} Discussion`;
   };
 
@@ -324,7 +348,7 @@ export default function ChatPage() {
               temperature: 0.7,
               maxOutputTokens: 200,
             },
-          })
+          }),
         }
       );
 
@@ -371,7 +395,7 @@ export default function ChatPage() {
               temperature: 0.5,
               maxOutputTokens: 500,
             },
-          })
+          }),
         }
       );
 
