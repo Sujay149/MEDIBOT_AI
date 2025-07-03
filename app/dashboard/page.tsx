@@ -143,7 +143,7 @@ export default function DashboardPage() {
               >
                 <Menu className="h-4 w-4 sm:h-5 sm:w-5" />
               </Button>
-              <div className="w-7 h-7 sm:w-8 sm:h-8 bg-gradient-to-r from-purple-600 to-blue-600 rounded-full flex items-center justify-center overflow-hidden">
+              <div className="w-7 h-7 sm:w-8 sm:h-8 bg-gradient-to-r from-primary to-primary/80 rounded-full flex items-center justify-center overflow-hidden">
                 <Image
                   src="/logo.png"
                   alt="Medibot Icon"
@@ -221,42 +221,52 @@ export default function DashboardPage() {
                 </Card>
               </div>
 
-              {/* Responsive Quick Actions */}
+              {/* Updated Quick Actions with Theme-Aware Colors */}
               <Card className="hover:shadow-md transition-shadow">
-                <CardHeader className="p-3 sm:p-4 pb-1 sm:pb-2">
-                  <CardTitle className="text-sm sm:text-base md:text-lg font-semibold text-foreground">
-                    Quick Actions
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="p-3 sm:p-4 pt-0 sm:pt-0">
-                  <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3">
-                    <Link href="/chat">
-                      <Button className="w-full h-9 sm:h-10 md:h-12 text-xs sm:text-sm bg-gradient-to-r from-purple-600 to-blue-600 text-white">
-                        {isMobile ? "Chat" : "New Chat"}
-                      </Button>
-                    </Link>
-                    <Link href="/medications">
-                      <Button variant="outline" className="w-full h-9 sm:h-10 md:h-12 text-xs sm:text-sm">
-                        {isMobile ? "Meds" : "Add Meds"}
-                      </Button>
-                    </Link>
-                    <Link href="/summarizer">
-                      <Button variant="outline" className="w-full h-9 sm:h-10 md:h-12 text-xs sm:text-sm">
-                        {isMobile ? "Search" : "Medical Info"}
-                      </Button>
-                    </Link>
-                    <Button 
-                      onClick={handleCreateSampleData} 
-                      variant="outline" 
-                      className="w-full h-9 sm:h-10 md:h-12 text-xs sm:text-sm"
-                    >
-                      {isMobile ? "Records" : "Appointments"}
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
+  <CardHeader className="p-3 sm:p-4 pb-1 sm:pb-2">
+    <CardTitle className="text-sm sm:text-base md:text-lg font-semibold text-foreground">
+      Quick Actions
+    </CardTitle>
+  </CardHeader>
+  <CardContent className="p-3 sm:p-4 pt-0 sm:pt-0">
+    <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3">
+      <Link href="/chat">
+        <Button
+          variant="outline"
+          className="w-full h-9 sm:h-10 md:h-12 text-xs sm:text-sm border-primary text-primary hover:bg-primary/10"
+        >
+          {isMobile ? "Chat" : "New Chat"}
+        </Button>
+      </Link>
+      <Link href="/medications">
+        <Button
+          variant="outline"
+          className="w-full h-9 sm:h-10 md:h-12 text-xs sm:text-sm border-primary text-primary hover:bg-primary/10"
+        >
+          {isMobile ? "Meds" : "Add Meds"}
+        </Button>
+      </Link>
+      <Link href="/summarizer">
+        <Button
+          variant="outline"
+          className="w-full h-9 sm:h-10 md:h-12 text-xs sm:text-sm border-primary text-primary hover:bg-primary/10"
+        >
+          {isMobile ? "Search" : "Medical Info"}
+        </Button>
+      </Link>
+      <Button
+        onClick={handleCreateSampleData}
+        variant="outline"
+        className="w-full h-9 sm:h-10 md:h-12 text-xs sm:text-sm border-primary text-primary hover:bg-primary/10"
+      >
+        {isMobile ? "Records" : "Appointments"}
+      </Button>
+    </div>
+  </CardContent>
+</Card>
 
-              {/* Responsive Recent Activity */}
+
+              {/* Recent Activity */}
               <Card className="hover:shadow-md transition-shadow">
                 <CardHeader className="p-3 sm:p-4 pb-1 sm:pb-2">
                   <CardTitle className="text-sm sm:text-base md:text-lg font-semibold text-foreground">
@@ -266,14 +276,14 @@ export default function DashboardPage() {
                 <CardContent className="p-3 sm:p-4 pt-0 sm:pt-0">
                   {loading ? (
                     <div className="text-center py-4 sm:py-6">
-                      <div className="w-5 h-5 sm:w-6 sm:h-6 border-2 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+                      <div className="w-5 h-5 sm:w-6 sm:h-6 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
                       <p className="text-xs sm:text-sm text-muted-foreground">Loading activity...</p>
                     </div>
                   ) : recentActivity.length > 0 ? (
                     <div className="space-y-2 sm:space-y-3">
                       {recentActivity.map((activity, index) => (
                         <div key={index} className="flex items-start space-x-2 sm:space-x-3 p-2 hover:bg-muted/50 rounded-lg transition-colors">
-                          <div className="w-2 h-2 mt-2 sm:mt-3 bg-purple-600 rounded-full flex-shrink-0"></div>
+                          <div className="w-2 h-2 mt-2 sm:mt-3 bg-primary rounded-full flex-shrink-0"></div>
                           <div className="flex-1 min-w-0">
                             <p className="text-xs sm:text-sm text-foreground line-clamp-1 sm:line-clamp-2">
                               {activity.message}
@@ -291,7 +301,7 @@ export default function DashboardPage() {
                       <p className="text-sm sm:text-base text-muted-foreground mb-1">No recent activity</p>
                       <p className="text-xs sm:text-sm text-muted-foreground mb-3">Start a conversation to see activity</p>
                       <Link href="/chat">
-                        <Button className="h-9 sm:h-10 text-xs sm:text-sm bg-gradient-to-r from-purple-600 to-blue-600 text-white">
+                        <Button className="h-9 sm:h-10 text-xs sm:text-sm bg-primary hover:bg-primary/90 text-primary-foreground">
                           Start Chat
                         </Button>
                       </Link>
