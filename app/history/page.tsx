@@ -32,11 +32,17 @@ import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { Skeleton } from "@/components/ui/skeleton";
 import Link from "next/link";
+import { Timestamp } from "firebase/firestore"; // Import Timestamp for type safety
+
+// Extend ChatSession type to ensure updatedAt is Date after processing
+interface ProcessedChatSession extends Omit<ChatSession, "updatedAt"> {
+  updatedAt: Date;
+}
 
 export default function HistoryPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
-  const [filteredSessions, setFilteredSessions] = useState<ChatSession[]>([]);
+  const [chatSessions, setChatSessions] = useState<ProcessedChatSession[]>([]);
+  const [filteredSessions, setFilteredSessions] = useState<ProcessedChatSession[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -85,7 +91,7 @@ export default function HistoryPage() {
               return {
                 ...session,
                 updatedAt: updatedAtDate,
-              };
+              } as ProcessedChatSession;
             })
             .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
 
