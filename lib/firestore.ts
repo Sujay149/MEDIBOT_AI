@@ -572,6 +572,50 @@ export const addHealthRecord = async (
     throw new Error("Failed to add health record");
   }
 };
+export const sendMedicationReminder = () => {
+  // TODO: Implement sendMedicationReminder
+  throw new Error("sendMedicationReminder not implemented");
+};
+export const subscribeToUserMedications = (
+  userId: string,
+  callback: (medications: Medication[]) => void,
+) => {
+  try {
+    const medicationsRef = collection(db, "medications");
+    const q = query(medicationsRef, where("userId", "==", userId), limit(50));
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const medications = snapshot.docs
+        .map(
+          (doc) =>
+            ({
+              id: doc.id,
+              ...doc.data(),
+            }) as Medication,
+        )
+        .sort((a, b) => {
+          const aTime = a.updatedAt instanceof Date ? a.updatedAt.getTime() : (a.updatedAt as any)?.seconds * 1000 || 0;
+          const bTime = b.updatedAt instanceof Date ? b.updatedAt.getTime() : (b.updatedAt as any)?.seconds * 1000 || 0;
+          return bTime - aTime;
+        });
+      callback(medications);
+    });
+
+    return unsubscribe;
+  } catch (error) {
+    console.error("Error subscribing to medications:", error);
+    return () => {};
+  }
+};
+// TODO: Implement getUserSummaries
+export const getUserSummaries = () => {
+  throw new Error("getUserSummaries not implemented");
+};
+// TODO: Implement addSummaryRequest
+export const addSummaryRequest = () => {
+  throw new Error("addSummaryRequest not implemented");
+};
+
 
 export const getUserHealthRecords = async (userId: string): Promise<HealthRecord[]> => {
   try {
