@@ -26,7 +26,15 @@ export default function DashboardPage() {
   const [medications, setMedications] = useState<Medication[]>([])
   const [healthRecords, setHealthRecords] = useState<HealthRecord[]>([])
   const [loading, setLoading] = useState(true)
+  const [isMobile, setIsMobile] = useState(false)
   const { user, userProfile } = useAuth()
+
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768)
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+    return () => window.removeEventListener('resize', checkMobile)
+  }, [])
 
   useEffect(() => {
     if (!user) return
@@ -111,162 +119,180 @@ export default function DashboardPage() {
     }
   }
 
+  const formatDate = (timestamp: Date | { seconds: number }) => {
+    const date = timestamp instanceof Date ? timestamp : new Date(timestamp.seconds * 1000)
+    return isMobile 
+      ? date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+      : date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+  }
+
   return (
     <AuthGuard>
       <div className="flex h-screen bg-background text-foreground">
         <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
-        <div className="flex-1 flex flex-col">
-          <div className="flex items-center justify-between p-4 border-b bg-card">
-            <div className="flex items-center space-x-3">
+        <div className="flex-1 flex flex-col overflow-hidden">
+          {/* Responsive Header */}
+          <div className="flex items-center justify-between p-3 sm:p-4 border-b bg-card sticky top-0 z-10">
+            <div className="flex items-center space-x-2 sm:space-x-3">
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={() => setSidebarOpen(!sidebarOpen)}
-                className="lg:hidden text-muted-foreground h-10 w-10"
+                className="md:hidden text-muted-foreground h-9 w-9 sm:h-10 sm:w-10"
               >
-                <Menu className="h-5 w-5" />
+                <Menu className="h-4 w-4 sm:h-5 sm:w-5" />
               </Button>
-              <div className="w-8 h-8 bg-gradient-to-r from-purple-600 to-blue-600 rounded-full flex items-center justify-center overflow-hidden">
+              <div className="w-7 h-7 sm:w-8 sm:h-8 bg-gradient-to-r from-purple-600 to-blue-600 rounded-full flex items-center justify-center overflow-hidden">
                 <Image
                   src="/logo.png"
                   alt="Medibot Icon"
-                  width={29}
-                  height={29}
+                  width={28}
+                  height={28}
                   className="object-cover rounded-full"
                 />
               </div>
-              <span className="font-semibold text-foreground">{userProfile?.displayName || "User"}'s Dashboard</span>
+              <span className="font-semibold text-sm sm:text-base text-foreground truncate max-w-[120px] sm:max-w-none">
+                {userProfile?.displayName || "User"}'s Dashboard
+              </span>
             </div>
           </div>
 
-          <div className="flex-1 p-4 sm:p-6 overflow-y-auto">
-            <div className="max-w-6xl mx-auto space-y-6">
+          <div className="flex-1 p-3 sm:p-4 md:p-6 overflow-y-auto">
+            <div className="max-w-6xl mx-auto space-y-4 sm:space-y-6">
+              {/* Responsive Title */}
               <div>
-                <h1 className="text-2xl sm:text-3xl font-bold mb-2 text-foreground">
+                <h1 className="text-xl sm:text-2xl md:text-3xl font-bold mb-1 sm:mb-2 text-foreground">
                   Welcome back, {userProfile?.displayName || "User"}!
                 </h1>
-                <p className="text-muted-foreground">Here's your health overview for today</p>
+                <p className="text-xs sm:text-sm text-muted-foreground">Here's your health overview</p>
               </div>
 
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between pb-2">
-                    <CardTitle className="text-xs sm:text-sm font-medium text-foreground">Chat Sessions</CardTitle>
-                    <MessageSquare className="h-4 w-4 text-muted-foreground" />
+              {/* Responsive Stats Grid */}
+              <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3 md:gap-4">
+                <Card className="hover:shadow-md transition-shadow">
+                  <CardHeader className="flex flex-row items-center justify-between p-3 sm:p-4 pb-1 sm:pb-2">
+                    <CardTitle className="text-xs sm:text-sm font-medium text-foreground">Chats</CardTitle>
+                    <MessageSquare className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
                   </CardHeader>
-                  <CardContent>
-                    <div className="text-xl sm:text-2xl font-bold text-foreground">{chatSessions.length}</div>
-                    <p className="text-xs text-muted-foreground">{totalMessages} total messages</p>
+                  <CardContent className="p-3 sm:p-4 pt-0 sm:pt-0">
+                    <div className="text-lg sm:text-xl md:text-2xl font-bold text-foreground">{chatSessions.length}</div>
+                    <p className="text-xs text-muted-foreground">{totalMessages} messages</p>
                   </CardContent>
                 </Card>
 
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between pb-2">
-                    <CardTitle className="text-xs sm:text-sm font-medium text-foreground">Medications</CardTitle>
-                    <Pill className="h-4 w-4 text-muted-foreground" />
+                <Card className="hover:shadow-md transition-shadow">
+                  <CardHeader className="flex flex-row items-center justify-between p-3 sm:p-4 pb-1 sm:pb-2">
+                    <CardTitle className="text-xs sm:text-sm font-medium text-foreground">Meds</CardTitle>
+                    <Pill className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
                   </CardHeader>
-                  <CardContent>
-                    <div className="text-xl sm:text-2xl font-bold text-foreground">{activeMedications}</div>
+                  <CardContent className="p-3 sm:p-4 pt-0 sm:pt-0">
+                    <div className="text-lg sm:text-xl md:text-2xl font-bold text-foreground">{activeMedications}</div>
                     <p className="text-xs text-muted-foreground">
-                      {activeMedications > 0 ? "Active medications" : "No medications"}
+                      {activeMedications > 0 ? "Active" : "None"}
                     </p>
                   </CardContent>
                 </Card>
 
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between pb-2">
-                    <CardTitle className="text-xs sm:text-sm font-medium text-foreground">Health Score</CardTitle>
-                    <Activity className="h-4 w-4 text-muted-foreground" />
+                <Card className="hover:shadow-md transition-shadow">
+                  <CardHeader className="flex flex-row items-center justify-between p-3 sm:p-4 pb-1 sm:pb-2">
+                    <CardTitle className="text-xs sm:text-sm font-medium text-foreground">Health</CardTitle>
+                    <Activity className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
                   </CardHeader>
-                  <CardContent>
-                    <div className="text-xl sm:text-2xl font-bold text-green-500">{calculateHealthScore()}</div>
+                  <CardContent className="p-3 sm:p-4 pt-0 sm:pt-0">
+                    <div className="text-lg sm:text-xl md:text-2xl font-bold text-green-500">{calculateHealthScore()}</div>
                     <p className="text-xs text-muted-foreground">
-                      {calculateHealthScore() >= 80 ? "Excellent" : calculateHealthScore() >= 60 ? "Good" : "Needs attention"}
+                      {calculateHealthScore() >= 80 ? "Great" : "Needs attention"}
                     </p>
                   </CardContent>
                 </Card>
 
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between pb-2">
-                    <CardTitle className="text-xs sm:text-sm font-medium text-foreground">Health Records</CardTitle>
-                    <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                <Card className="hover:shadow-md transition-shadow">
+                  <CardHeader className="flex flex-row items-center justify-between p-3 sm:p-4 pb-1 sm:pb-2">
+                    <CardTitle className="text-xs sm:text-sm font-medium text-foreground">Records</CardTitle>
+                    <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
                   </CardHeader>
-                  <CardContent>
-                    <div className="text-xl sm:text-2xl font-bold text-foreground">{healthRecords.length}</div>
+                  <CardContent className="p-3 sm:p-4 pt-0 sm:pt-0">
+                    <div className="text-lg sm:text-xl md:text-2xl font-bold text-foreground">{healthRecords.length}</div>
                     <p className="text-xs text-muted-foreground">
-                      {healthRecords.length > 0 ? "Records tracked" : "No records yet"}
+                      {healthRecords.length > 0 ? "Tracked" : "None"}
                     </p>
                   </CardContent>
                 </Card>
               </div>
 
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-xl font-semibold text-black dark:text-white"
->Quick Actions</CardTitle>
+              {/* Responsive Quick Actions */}
+              <Card className="hover:shadow-md transition-shadow">
+                <CardHeader className="p-3 sm:p-4 pb-1 sm:pb-2">
+                  <CardTitle className="text-sm sm:text-base md:text-lg font-semibold text-foreground">
+                    Quick Actions
+                  </CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <CardContent className="p-3 sm:p-4 pt-0 sm:pt-0">
+                  <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3">
                     <Link href="/chat">
-                      <Button className="w-full bg-gradient-to-r from-purple-600 to-blue-600 text-white h-12">
-                        Start New Chat
+                      <Button className="w-full h-9 sm:h-10 md:h-12 text-xs sm:text-sm bg-gradient-to-r from-purple-600 to-blue-600 text-white">
+                        {isMobile ? "Chat" : "New Chat"}
                       </Button>
                     </Link>
                     <Link href="/medications">
-                      <Button variant="outline" className="w-full h-12 text-foreground">
-                        Add Medication
+                      <Button variant="outline" className="w-full h-9 sm:h-10 md:h-12 text-xs sm:text-sm">
+                        {isMobile ? "Meds" : "Add Meds"}
                       </Button>
                     </Link>
                     <Link href="/summarizer">
-                      <Button variant="outline" className="w-full h-12 text-foreground">
-                        Search Medical Info
+                      <Button variant="outline" className="w-full h-9 sm:h-10 md:h-12 text-xs sm:text-sm">
+                        {isMobile ? "Search" : "Medical Info"}
                       </Button>
                     </Link>
-                    <Link href="/appointments">
-                      <Button onClick={handleCreateSampleData} variant="outline" className="w-full h-12 text-foreground">
-                        <Plus className="mr-2 h-4 w-4" />Appointments Record
-                      </Button>
-                    </Link>
+                    <Button 
+                      onClick={handleCreateSampleData} 
+                      variant="outline" 
+                      className="w-full h-9 sm:h-10 md:h-12 text-xs sm:text-sm"
+                    >
+                      {isMobile ? "Records" : "Appointments"}
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
 
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-xl font-semibold text-black dark:text-white"
->Recent Activity</CardTitle>
+              {/* Responsive Recent Activity */}
+              <Card className="hover:shadow-md transition-shadow">
+                <CardHeader className="p-3 sm:p-4 pb-1 sm:pb-2">
+                  <CardTitle className="text-sm sm:text-base md:text-lg font-semibold text-foreground">
+                    Recent Activity
+                  </CardTitle>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="p-3 sm:p-4 pt-0 sm:pt-0">
                   {loading ? (
-                    <div className="text-center py-8">
-                      <div className="w-6 h-6 border-2 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
-                      <p className="text-muted-foreground">Loading activity...</p>
+                    <div className="text-center py-4 sm:py-6">
+                      <div className="w-5 h-5 sm:w-6 sm:h-6 border-2 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+                      <p className="text-xs sm:text-sm text-muted-foreground">Loading activity...</p>
                     </div>
                   ) : recentActivity.length > 0 ? (
-                    <div className="space-y-4">
+                    <div className="space-y-2 sm:space-y-3">
                       {recentActivity.map((activity, index) => (
-                        <div key={index} className="flex items-start space-x-3">
-                          <div className="w-2 h-2 bg-purple-600 rounded-full mt-2"></div>
+                        <div key={index} className="flex items-start space-x-2 sm:space-x-3 p-2 hover:bg-muted/50 rounded-lg transition-colors">
+                          <div className="w-2 h-2 mt-2 sm:mt-3 bg-purple-600 rounded-full flex-shrink-0"></div>
                           <div className="flex-1 min-w-0">
-                            <span className="text-sm text-foreground block truncate">{activity.message}</span>
-                            <span className="text-xs text-muted-foreground">
-                              in {activity.sessionTitle} • {activity.timestamp instanceof Date
-                                ? activity.timestamp.toLocaleDateString()
-                                : activity.timestamp?.toDate()?.toLocaleDateString() || "Recently"}
-                            </span>
+                            <p className="text-xs sm:text-sm text-foreground line-clamp-1 sm:line-clamp-2">
+                              {activity.message}
+                            </p>
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              in {activity.sessionTitle} • {formatDate(activity.timestamp)}
+                            </p>
                           </div>
                         </div>
                       ))}
                     </div>
                   ) : (
-                    <div className="text-center py-8">
-                      <MessageSquare className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                      <p className="text-muted-foreground mb-2">No recent activity</p>
-                      <p className="text-sm text-muted-foreground">Start a conversation to see your activity here</p>
+                    <div className="text-center py-4 sm:py-6">
+                      <MessageSquare className="h-8 w-8 sm:h-10 sm:w-10 text-muted-foreground mx-auto mb-3" />
+                      <p className="text-sm sm:text-base text-muted-foreground mb-1">No recent activity</p>
+                      <p className="text-xs sm:text-sm text-muted-foreground mb-3">Start a conversation to see activity</p>
                       <Link href="/chat">
-                        <Button className="mt-4 bg-gradient-to-r from-purple-600 to-blue-600 text-white">
-                          Start Your First Chat
+                        <Button className="h-9 sm:h-10 text-xs sm:text-sm bg-gradient-to-r from-purple-600 to-blue-600 text-white">
+                          Start Chat
                         </Button>
                       </Link>
                     </div>

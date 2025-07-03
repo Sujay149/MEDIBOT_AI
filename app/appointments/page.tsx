@@ -41,25 +41,6 @@ export default function AppointmentsPage() {
     return unsubscribe;
   }, [user]);
 
-  const sendAppointmentEmail = async (appointment: Appointment) => {
-    try {
-      await axios.post("/api/send-appointment-email", {
-        userEmail: user?.email,
-        appointment: {
-          hospitalName: appointment.hospitalName,
-          doctorName: appointment.doctorName,
-          date: appointment.date,
-          time: appointment.time,
-          notes: appointment.notes || "No additional notes",
-        },
-      });
-      toast.success("Appointment confirmation email sent!");
-    } catch (error) {
-      console.error("Error sending email:", error);
-      toast.error("Failed to send appointment confirmation email");
-    }
-  };
-
   const handleAddAppointment = () => {
     setEditingAppointment(null);
     setDialogOpen(true);
@@ -122,11 +103,16 @@ export default function AppointmentsPage() {
     return isMobile 
       ? date.toLocaleDateString("en-US", { month: "short", day: "numeric" })
       : date.toLocaleDateString("en-US", { 
-          weekday: "long", 
-          year: "numeric", 
-          month: "long", 
+          weekday: "short", 
+          month: "short", 
           day: "numeric" 
         });
+  };
+
+  const formatTimeForMobile = (timeString: string) => {
+    return isMobile 
+      ? timeString.replace(/:00$/, '') // Remove :00 if it's exactly on the hour
+      : timeString;
   };
 
   return (
@@ -135,44 +121,37 @@ export default function AppointmentsPage() {
         <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
         <div className="flex-1 flex flex-col overflow-hidden">
-          {/* Header - Optimized for larger screens and mobile */}
-          <div className="flex items-center justify-between p-4 md:p-6 border-b border-border bg-card sticky top-0 z-10">
-            <div className="flex items-center space-x-3">
+          {/* Mobile-optimized header */}
+          <div className="flex items-center justify-between p-3 border-b border-border bg-card sticky top-0 z-10">
+            <div className="flex items-center space-x-2">
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={() => setSidebarOpen(true)}
-                className="text-muted-foreground hover:text-foreground lg:hidden h-10 w-10 md:h-12 md:w-12"
+                className="text-muted-foreground hover:text-foreground h-9 w-9"
                 aria-label="Open sidebar"
               >
-                <Menu className="h-5 w-5 md:h-6 md:w-6" />
+                <Menu className="h-5 w-5" />
               </Button>
-              <div className="w-9 h-9 md:w-12 md:h-12 bg-purple-600 rounded-full flex items-center justify-center">
-                <Calendar className="h-4 w-4 md:h-6 md:w-6 text-white" />
+              <div className="w-8 h-8 bg-purple-600 rounded-full flex items-center justify-center">
+                <Calendar className="h-3.5 w-3.5 text-white" />
               </div>
-              <span className="font-semibold text-lg md:text-xl">Appointments</span>
+              <span className="font-semibold text-base">Appointments</span>
             </div>
 
             <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
               <DialogTrigger asChild>
                 <Button
                   onClick={handleAddAppointment}
-                  size={isMobile ? "icon" : "default"}
-                  className="bg-purple-600 hover:bg-purple-700 text-white rounded-lg h-10 md:h-12 px-4 md:px-6 text-sm md:text-base"
+                  size="icon"
+                  className="bg-purple-600 hover:bg-purple-700 text-white rounded-lg h-9 w-9"
                 >
-                  {isMobile ? (
-                    <Plus className="h-5 w-5 md:h-6 md:w-6" />
-                  ) : (
-                    <>
-                      <Plus className="mr-2 h-4 w-4 md:h-5 md:w-5" />
-                      <span>Book</span>
-                    </>
-                  )}
+                  <Plus className="h-4 w-4" />
                 </Button>
               </DialogTrigger>
-              <DialogContent className="bg-card border-border max-w-[95vw] md:max-w-lg rounded-lg mx-auto max-h-[90vh] overflow-y-auto p-4 md:p-6">
+              <DialogContent className="bg-card border-border max-w-[95vw] rounded-lg mx-auto max-h-[90vh] overflow-y-auto p-4">
                 <DialogHeader>
-                  <DialogTitle className="text-lg md:text-xl">
+                  <DialogTitle className="text-base">
                     {editingAppointment ? "Edit Appointment" : "New Appointment"}
                   </DialogTitle>
                 </DialogHeader>
@@ -191,116 +170,116 @@ export default function AppointmentsPage() {
             </Dialog>
           </div>
 
-          {/* Content - Optimized for larger screens and mobile */}
-          <div className="flex-1 p-4 md:p-8 overflow-y-auto">
-            <div className="max-w-full md:max-w-4xl mx-auto space-y-6">
+          {/* Mobile-optimized content */}
+          <div className="flex-1 p-3 overflow-y-auto">
+            <div className="max-w-full mx-auto space-y-4">
               <div>
-                <h1 className="text-xl md:text-2xl font-semibold">Your Appointments</h1>
-                <p className="text-muted-foreground text-sm md:text-base">Manage your medical schedules</p>
+                <h1 className="text-lg font-semibold">Your Appointments</h1>
+                <p className="text-muted-foreground text-xs">Manage your medical schedules</p>
               </div>
 
-              {/* Stats - Larger cards on big screens */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
+              {/* Mobile stats cards */}
+              <div className="grid grid-cols-3 gap-2">
                 <Card className="bg-card border-border rounded-lg shadow-sm">
-                  <CardContent className="p-4 md:p-6 text-center">
-                    <div className="text-2xl md:text-3xl font-semibold text-purple-600">{appointments.length}</div>
-                    <div className="text-muted-foreground text-sm md:text-base">Total</div>
+                  <CardContent className="p-3 text-center">
+                    <div className="text-xl font-semibold text-purple-600">{appointments.length}</div>
+                    <div className="text-muted-foreground text-xs">Total</div>
                   </CardContent>
                 </Card>
                 <Card className="bg-card border-border rounded-lg shadow-sm">
-                  <CardContent className="p-4 md:p-6 text-center">
-                    <div className="text-2xl md:text-3xl font-semibold text-yellow-600">{upcomingAppointments.length}</div>
-                    <div className="text-muted-foreground text-sm md:text-base">Upcoming</div>
+                  <CardContent className="p-3 text-center">
+                    <div className="text-xl font-semibold text-yellow-600">{upcomingAppointments.length}</div>
+                    <div className="text-muted-foreground text-xs">Upcoming</div>
                   </CardContent>
                 </Card>
                 <Card className="bg-card border-border rounded-lg shadow-sm">
-                  <CardContent className="p-4 md:p-6 text-center">
-                    <div className="text-2xl md:text-3xl font-semibold text-green-600">{pastAppointments.length}</div>
-                    <div className="text-muted-foreground text-sm md:text-base">Completed</div>
+                  <CardContent className="p-3 text-center">
+                    <div className="text-xl font-semibold text-green-600">{pastAppointments.length}</div>
+                    <div className="text-muted-foreground text-xs">Completed</div>
                   </CardContent>
                 </Card>
               </div>
 
               {loading ? (
-                <div className="text-center py-10">
-                  <div className="w-6 h-6 md:w-8 md:h-8 border-4 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
-                  <p className="text-muted-foreground text-sm md:text-base">Loading...</p>
+                <div className="text-center py-6">
+                  <div className="w-5 h-5 border-3 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+                  <p className="text-muted-foreground text-xs">Loading appointments...</p>
                 </div>
               ) : appointments.length > 0 ? (
-                <div className="space-y-6">
-                  {/* Upcoming Appointments - Larger cards */}
+                <div className="space-y-3">
+                  {/* Upcoming Appointments - Mobile cards */}
                   {upcomingAppointments.length > 0 && (
                     <div>
-                      <h2 className="text-lg md:text-xl font-semibold mb-3">Upcoming</h2>
-                      <div className="space-y-3">
+                      <h2 className="text-base font-semibold mb-2">Upcoming</h2>
+                      <div className="space-y-2">
                         {upcomingAppointments.map((appointment) => {
                           const { status, color } = getAppointmentStatus(appointment);
                           return (
                             <Card key={appointment.id} className="bg-card border-border rounded-lg shadow-sm">
-                              <CardContent className="p-4 md:p-6">
-                                <div className="flex flex-col md:flex-row md:justify-between md:items-start">
+                              <CardContent className="p-3">
+                                <div className="flex justify-between items-start">
                                   <div className="flex-1">
-                                    <div className="flex items-center space-x-2 mb-2">
-                                      <h3 className="font-medium text-base md:text-lg line-clamp-1">
+                                    <div className="flex items-center space-x-1 mb-1">
+                                      <h3 className="font-medium text-sm line-clamp-1">
                                         {appointment.hospitalName}
                                       </h3>
-                                      <Badge className={`${color} text-white text-xs md:text-sm px-2 py-1`}>
+                                      <Badge className={`${color} text-white text-xs px-1.5 py-0.5`}>
                                         {status === "upcoming" ? "Soon" : "Scheduled"}
                                       </Badge>
                                     </div>
 
-                                    <div className="text-sm md:text-base space-y-1.5">
+                                    <div className="text-xs space-y-1">
                                       <div className="flex items-center text-foreground">
-                                        <User className="mr-1.5 h-4 w-4 md:h-5 md:w-5 text-muted-foreground" />
+                                        <User className="mr-1 h-3 w-3 text-muted-foreground" />
                                         <span className="truncate">Dr. {appointment.doctorName}</span>
                                       </div>
                                       <div className="flex items-center text-foreground">
-                                        <Calendar className="mr-1.5 h-4 w-4 md:h-5 md:w-5 text-muted-foreground" />
+                                        <Calendar className="mr-1 h-3 w-3 text-muted-foreground" />
                                         {formatDateForMobile(appointment.date)}
                                       </div>
                                       <div className="flex items-center text-foreground">
-                                        <Clock className="mr-1.5 h-4 w-4 md:h-5 md:w-5 text-muted-foreground" />
-                                        {appointment.time}
+                                        <Clock className="mr-1 h-3 w-3 text-muted-foreground" />
+                                        {formatTimeForMobile(appointment.time)}
                                       </div>
                                     </div>
                                   </div>
 
-                                  <div className="flex items-center space-x-2 mt-3 md:mt-0 md:ml-4">
+                                  <div className="flex items-center space-x-1 ml-2">
                                     <Button
                                       variant="ghost"
                                       size="icon"
                                       onClick={() => handleGetDirections(appointment)}
-                                      className="h-8 w-8 md:h-10 md:w-10 text-muted-foreground"
+                                      className="h-7 w-7 text-muted-foreground"
                                       title="Directions"
                                     >
-                                      <Navigation className="h-4 w-4 md:h-5 md:w-5" />
+                                      <Navigation className="h-3.5 w-3.5" />
                                     </Button>
                                     <Button
                                       variant="ghost"
                                       size="icon"
                                       onClick={() => handleEditAppointment(appointment)}
-                                      className="h-8 w-8 md:h-10 md:w-10 text-muted-foreground"
+                                      className="h-7 w-7 text-muted-foreground"
                                       title="Edit"
                                     >
-                                      <Edit className="h-4 w-4 md:h-5 md:w-5" />
+                                      <Edit className="h-3.5 w-3.5" />
                                     </Button>
                                   </div>
                                 </div>
 
                                 {appointment.notes && (
-                                  <div className="mt-3 p-3 bg-muted rounded text-sm md:text-base line-clamp-2">
+                                  <div className="mt-2 p-2 bg-muted rounded text-xs line-clamp-2">
                                     {appointment.notes}
                                   </div>
                                 )}
 
-                                <div className="mt-3 flex justify-end">
+                                <div className="mt-2 flex justify-end">
                                   <Button
                                     variant="ghost"
                                     size="sm"
                                     onClick={() => appointment.id && handleDeleteAppointment(appointment.id)}
-                                    className="text-sm md:text-base h-8 text-red-500 hover:text-red-600"
+                                    className="text-xs h-7 text-red-500 hover:text-red-600 px-2"
                                   >
-                                    <Trash2 className="mr-1.5 h-4 w-4 md:h-5 md:w-5" />
+                                    <Trash2 className="mr-1 h-3.5 w-3.5" />
                                     Delete
                                   </Button>
                                 </div>
@@ -312,23 +291,23 @@ export default function AppointmentsPage() {
                     </div>
                   )}
 
-                  {/* Past Appointments - Larger compact cards */}
+                  {/* Past Appointments - Compact mobile cards */}
                   {pastAppointments.length > 0 && (
                     <div>
-                      <h2 className="text-lg md:text-xl font-semibold mb-3">Past Appointments</h2>
-                      <div className="space-y-3">
+                      <h2 className="text-base font-semibold mb-2">Past Appointments</h2>
+                      <div className="space-y-2">
                         {pastAppointments.slice(0, 3).map((appointment) => (
                           <Card key={appointment.id} className="bg-card border-border rounded-lg shadow-sm opacity-80">
-                            <CardContent className="p-4 md:p-6">
+                            <CardContent className="p-3">
                               <div className="flex justify-between items-center">
-                                <div>
-                                  <div className="flex items-center space-x-2">
-                                    <h3 className="font-medium text-base md:text-lg">{appointment.hospitalName}</h3>
-                                    <Badge className="bg-green-600 text-white text-xs md:text-sm px-2 py-1">
-                                      Completed
+                                <div className="truncate">
+                                  <div className="flex items-center space-x-1">
+                                    <h3 className="font-medium text-sm truncate">{appointment.hospitalName}</h3>
+                                    <Badge className="bg-green-600 text-white text-xs px-1.5 py-0.5">
+                                      Done
                                     </Badge>
                                   </div>
-                                  <div className="text-sm md:text-base text-muted-foreground">
+                                  <div className="text-xs text-muted-foreground truncate">
                                     Dr. {appointment.doctorName} • {formatDateForMobile(appointment.date)}
                                   </div>
                                 </div>
@@ -336,10 +315,10 @@ export default function AppointmentsPage() {
                                   variant="ghost"
                                   size="icon"
                                   onClick={() => appointment.id && handleDeleteAppointment(appointment.id)}
-                                  className="h-8 w-8 md:h-10 md:w-10 text-red-500"
+                                  className="h-7 w-7 text-red-500"
                                   title="Delete"
                                 >
-                                  <Trash2 className="h-4 w-4 md:h-5 md:w-5" />
+                                  <Trash2 className="h-3.5 w-3.5" />
                                 </Button>
                               </div>
                             </CardContent>
@@ -347,32 +326,32 @@ export default function AppointmentsPage() {
                         ))}
                       </div>
                       {pastAppointments.length > 3 && (
-                        <div className="text-center text-sm md:text-base text-muted-foreground mt-3">
-                          + {pastAppointments.length - 3} more past appointments
+                        <div className="text-center text-xs text-muted-foreground mt-1">
+                          + {pastAppointments.length - 3} more
                         </div>
                       )}
                     </div>
                   )}
                 </div>
               ) : (
-                /* Empty State - Larger for big screens, enhanced for mobile */
-                <div className="bg-card border-border rounded-xl p-6 md:p-8 text-center shadow-sm mt-6">
-                  <div className="w-12 h-12 md:w-16 md:h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
-                    <Calendar className="h-6 w-6 md:h-8 md:w-8 text-muted-foreground" />
+                /* Mobile empty state */
+                <div className="bg-card border-border rounded-lg p-4 text-center shadow-sm mt-4">
+                  <div className="w-10 h-10 bg-muted rounded-full flex items-center justify-center mx-auto mb-3">
+                    <Calendar className="h-4 w-4 text-muted-foreground" />
                   </div>
-                  <h3 className="text-lg md:text-xl font-semibold mb-2">
+                  <h3 className="text-base font-semibold mb-1">
                     No appointments
                   </h3>
-                  <p className="text-muted-foreground mb-4 text-sm md:text-base">
+                  <p className="text-muted-foreground mb-3 text-xs">
                     Book your first medical appointment
                   </p>
                   <Button
                     onClick={handleAddAppointment}
                     size="sm"
-                    className="bg-purple-600 hover:bg-purple-700 text-white rounded-lg h-10 md:h-12 px-4 md:px-6 text-sm md:text-base"
+                    className="bg-purple-600 hover:bg-purple-700 text-white rounded-lg h-9 px-3 text-xs"
                   >
-                    <Plus className="mr-1.5 h-4 w-4 md:h-5 md:w-5" />
-                    Book Appointment
+                    <Plus className="mr-1 h-3.5 w-3.5" />
+                    Book Now
                   </Button>
                 </div>
               )}
