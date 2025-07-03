@@ -232,7 +232,7 @@ export function AppointmentForm({ appointment, onSuccess, onCancel }: Appointmen
         await updateAppointment(appointment.id, { ...appointmentData, hospitalLocation: hospitalLocation ?? undefined });
         toast.success("Appointment updated successfully!");
       } else {
-        await addAppointment(user.uid, { ...appointmentData, hospitalLocation: hospitalLocation ?? undefined });
+        await addAppointment(user.uid, { ...appointmentData, hospitalLocation: hospitalLocation ?? undefined, status: "scheduled" });
         toast.success("Appointment booked successfully!");
       }
 
