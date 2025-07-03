@@ -18,6 +18,8 @@ import {
   LogOut,
   Calendar,
   X,
+  Menu,
+  MessageSquare,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
@@ -33,30 +35,49 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(isOpen);
-  const [sidebarWidth, setSidebarWidth] = useState(250); // Default width in pixels
+  const [sidebarWidth, setSidebarWidth] = useState(250);
   const sidebarRef = useRef<HTMLDivElement>(null);
   const resizerRef = useRef<HTMLDivElement>(null);
   const [isResizing, setIsResizing] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
     setMounted(true);
+    
+    // Check if mobile view
+    const checkIfMobile = () => {
+      setIsMobile(window.innerWidth < 1024);
+    };
+    
+    checkIfMobile();
+    window.addEventListener('resize', checkIfMobile);
+    
+    return () => {
+      window.removeEventListener('resize', checkIfMobile);
+    };
+  }, []);
 
+  useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
-      if (isResizing && resizerRef.current && sidebarRef.current) {
-        const newWidth = e.clientX - sidebarRef.current.getBoundingClientRect().left;
-        if (newWidth > 100 && newWidth < 400) { // Min 100px for icon-only, max 400px
-          setSidebarWidth(newWidth);
-        }
+      if (!isResizing || !resizerRef.current || !sidebarRef.current) return;
+      
+      const newWidth = e.clientX - sidebarRef.current.getBoundingClientRect().left;
+      if (newWidth > 100 && newWidth < 400) {
+        setSidebarWidth(newWidth);
       }
     };
 
     const handleMouseUp = () => {
       setIsResizing(false);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
     };
 
     const handleMouseDown = (e: MouseEvent) => {
-      if (resizerRef.current && resizerRef.current.contains(e.target as Node)) {
+      if (resizerRef.current?.contains(e.target as Node)) {
         setIsResizing(true);
+        document.body.style.cursor = 'col-resize';
+        document.body.style.userSelect = 'none';
       }
     };
 
@@ -78,7 +99,7 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
     { icon: Pill, label: "Medications", href: "/medications" },
     { icon: History, label: "Chat History", href: "/history" },
     { icon: User, label: "My Profile", href: "/profile" },
-    { icon: User, label: "Feedback", href: "/feedback" },
+    { icon: MessageSquare, label: "Feedback", href: "/feedback" },
   ];
 
   const handleSignOut = async () => {
@@ -105,68 +126,82 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
     }
   };
 
-  const isIconOnly = sidebarWidth <= 150; // Threshold for icon-only mode
+  const isIconOnly = sidebarWidth <= 150 && !isMobile;
+
+  // Close sidebar when route changes on mobile
+  useEffect(() => {
+    if (isMobile) {
+      setSidebarOpen(false);
+    }
+  }, [pathname, isMobile]);
 
   return (
     <>
-      {sidebarOpen && (
+      {/* Mobile overlay */}
+      {sidebarOpen && isMobile && (
         <div
           className="fixed inset-0 bg-black/50 z-40 lg:hidden"
           onClick={handleOverlayClick}
-          onTouchStart={(e) => {
-            if (e.target === e.currentTarget) {
-              setSidebarOpen(false);
-            }
-          }}
         />
       )}
 
       <div className="lg:flex lg:items-start">
-        {/* Hamburger Menu Button - Visible only on small screens */}
+        {/* Mobile menu button */}
         <Button
           variant="ghost"
           size="icon"
           onClick={toggleSidebar}
-          className="fixed top-4 left-4 z-50 bg-card border-border text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg lg:hidden h-10 w-10 transition-transform hover:scale-105"
+          className="fixed top-4 left-4 z-50 bg-card border border-border text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg lg:hidden h-10 w-10"
           aria-label="Toggle sidebar"
         >
-          <svg
-            className="h-6 w-6 text-purple-600"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth="2"
-              d="M4 6h16M4 12h16m-7 6h7"
-            />
-          </svg>
+          <Menu className="h-5 w-5" />
         </Button>
 
         {/* Sidebar */}
         <div
           ref={sidebarRef}
           className={cn(
-            "fixed inset-y-0 left-0 z-50 bg-card transition-transform duration-300 ease-in-out border-r border-border",
+            "fixed inset-y-0 left-0 z-50 bg-card border-r border-border",
+            "transition-all duration-300 ease-in-out",
+            "flex flex-col",
             sidebarOpen ? "translate-x-0" : "-translate-x-full",
-            "lg:translate-x-0 lg:static lg:inset-0 lg:flex lg:h-screen lg:flex-col"
+            "lg:translate-x-0 lg:static lg:inset-0",
+            isMobile ? "w-[280px]" : ""
           )}
-          style={{ width: sidebarOpen || window.innerWidth >= 1024 ? `${sidebarWidth}px` : "80px" }}
+          style={{
+            width: !isMobile ? `${sidebarWidth}px` : undefined,
+          }}
         >
-          <div className="flex flex-col h-full p-4">
+          <div className="flex flex-col h-full p-4 overflow-y-auto">
             <div className="flex items-center justify-between mb-8">
               <div className="flex items-center space-x-3">
                 <div className="w-8 h-8 relative">
-                  <Image src="/logo.png" alt="MedBot Logo" width={32} height={32} className="rounded-full" />
+                  <Image 
+                    src="/logo.png" 
+                    alt="MedBot Logo" 
+                    width={32} 
+                    height={32} 
+                    className="rounded-full" 
+                  />
                 </div>
-                {!isIconOnly && <span className="text-foreground font-semibold text-lg">Medibot</span>}
+                {(!isIconOnly || isMobile) && (
+                  <span className="text-foreground font-semibold text-lg">Medibot</span>
+                )}
               </div>
-              {/* No ">>>" button */}
+              
+              {isMobile && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setSidebarOpen(false)}
+                  className="h-8 w-8"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              )}
             </div>
 
+            {/* User profile */}
             <div className="bg-muted rounded-xl p-4 mb-6 border border-border">
               <div className="flex items-center space-x-3">
                 <Avatar className="w-12 h-12">
@@ -178,17 +213,20 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
                       "U"}
                   </AvatarFallback>
                 </Avatar>
-                {!isIconOnly && (
+                {(!isIconOnly || isMobile) && (
                   <div className="flex-1 min-w-0">
                     <p className="text-foreground font-medium truncate">
                       {userProfile?.displayName || user?.displayName || user?.email?.split("@")[0] || "User"}
                     </p>
-                    <p className="text-muted-foreground text-sm truncate">{user?.email || "user@example.com"}</p>
+                    <p className="text-muted-foreground text-sm truncate">
+                      {user?.email || "user@example.com"}
+                    </p>
                   </div>
                 )}
               </div>
             </div>
 
+            {/* Navigation */}
             <nav className="flex-1 space-y-2">
               {menuItems.map((item) => {
                 const isActive = pathname === item.href;
@@ -198,16 +236,18 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
                       <Button
                         variant="ghost"
                         className={cn(
-                          "w-full justify-center lg:justify-start text-left h-12 rounded-xl transition-all duration-200",
+                          "w-full justify-start text-left h-12 rounded-xl transition-all duration-200",
+                          "flex items-center",
                           isActive
                             ? "bg-purple-600 text-white shadow"
-                            : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                            : "text-muted-foreground hover:text-foreground hover:bg-muted",
+                          isIconOnly && !isMobile ? "justify-center" : "px-4"
                         )}
                       >
-                        <item.icon
-                          className={cn("mr-0 lg:mr-3 h-5 w-5", isIconOnly ? "mx-auto" : "")}
-                        />
-                        {!isIconOnly && <span className="ml-2">{item.label}</span>}
+                        <item.icon className="h-5 w-5 flex-shrink-0" />
+                        {(!isIconOnly || isMobile) && (
+                          <span className="ml-3">{item.label}</span>
+                        )}
                       </Button>
                     </a>
                   </Link>
@@ -215,35 +255,55 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
               })}
             </nav>
 
-            <div className="mt-auto space-y-3">
+            {/* Bottom actions */}
+            <div className="mt-auto space-y-3 pt-10">
               {mounted && (
                 <Button
                   variant="ghost"
                   onClick={toggleTheme}
-                  className="w-full justify-center lg:justify-start text-muted-foreground hover:text-foreground hover:bg-muted rounded-xl h-12 transition-all duration-200"
+                  className={cn(
+                    "w-full justify-start h-12 rounded-xl",
+                    "text-muted-foreground hover:text-foreground hover:bg-muted",
+                    isIconOnly && !isMobile ? "justify-center" : "px-4"
+                  )}
                 >
-                  <Sun className="mr-0 lg:mr-3 h-5 w-5" />
-                  {!isIconOnly && (theme === "dark" ? "Theme: Light" : "Theme: Dark")}
+                  {theme === "dark" ? (
+                    <Sun className="h-5 w-5" />
+                  ) : (
+                    <Moon className="h-5 w-5" />
+                  )}
+                  {(!isIconOnly || isMobile) && (
+                    <span className="ml-3">
+                      {theme === "dark" ? "Light Mode" : "Dark Mode"}
+                    </span>
+                  )}
                 </Button>
               )}
 
               <Button
                 onClick={handleSignOut}
                 variant="outline"
-                className="w-full justify-center lg:justify-start border-border text-muted-foreground hover:text-red-400 hover:bg-muted rounded-xl h-12 transition-all duration-200"
+                className={cn(
+                  "w-full justify-start border-border h-12 rounded-xl",
+                  "text-muted-foreground hover:text-red-400 hover:bg-muted",
+                  isIconOnly && !isMobile ? "justify-center" : "px-4"
+                )}
               >
-                <LogOut className="mr-0 lg:mr-3 h-5 w-5" />
-                {!isIconOnly && "Sign Out"}
+                <LogOut className="h-5 w-5" />
+                {(!isIconOnly || isMobile) && <span className="ml-3">Sign Out</span>}
               </Button>
             </div>
           </div>
-          {/* Resizer Handle */}
-          <div
-            ref={resizerRef}
-            className="absolute right-0 top-0 w-2 h-full bg-gray-400 cursor-col-resize hover:bg-purple-600 transition-colors z-10"
-            style={{ left: `${sidebarWidth - 2}px` }}
-            onMouseDown={(e) => e.preventDefault()} // Prevent text selection
-          ></div>
+          
+          {/* Resizer (desktop only) */}
+          {!isMobile && (
+            <div
+              ref={resizerRef}
+              className="absolute right-0 top-0 w-1.5 h-full bg-border cursor-col-resize hover:bg-purple-600 active:bg-purple-600 transition-colors z-10"
+              style={{ left: `${sidebarWidth - 2}px` }}
+              onMouseDown={(e) => e.preventDefault()}
+            />
+          )}
         </div>
       </div>
     </>
