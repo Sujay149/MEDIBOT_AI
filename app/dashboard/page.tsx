@@ -10,8 +10,6 @@ import { useAuth } from "@/hooks/useAuth"
 import {
   getUserHealthRecords,
   subscribeToUserChatSessions,
-  subscribeToUserMedications,
-  createSampleHealthRecord,
   type ChatSession,
   type Medication,
   type HealthRecord,
@@ -19,6 +17,24 @@ import {
 import Link from "next/link"
 import { toast } from "sonner"
 import Image from "next/image"
+
+function formatDate(timestamp: Date | { seconds: number }) {
+  let date: Date
+  if (timestamp instanceof Date) {
+    date = timestamp
+  } else if (timestamp && typeof timestamp.seconds === "number") {
+    date = new Date(timestamp.seconds * 1000)
+  } else {
+    return ""
+  }
+  return date.toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  })
+}
 
 export default function DashboardPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -46,9 +62,9 @@ export default function DashboardPage() {
       setLoading(false)
     })
 
-    const unsubscribeMedications = subscribeToUserMedications(user.uid, (meds) => {
-      setMedications(meds)
-    })
+    // TODO: Replace this with the correct subscription for medications if available
+    setMedications([]) // Set to empty or fetch medications another way if needed
+    const unsubscribeMedications = () => {};
 
     const loadHealthRecords = async () => {
       try {
@@ -56,14 +72,7 @@ export default function DashboardPage() {
         setHealthRecords(records)
       } catch (error) {
         console.error("Error loading health records:", error)
-        try {
-          await createSampleHealthRecord(user.uid)
-          const records = await getUserHealthRecords(user.uid)
-          setHealthRecords(records)
-        } catch (sampleError) {
-          console.error("Error creating sample record:", sampleError)
-          setHealthRecords([])
-        }
+        setHealthRecords([])
       }
     }
 
@@ -106,26 +115,8 @@ export default function DashboardPage() {
   }
 
   const handleCreateSampleData = async () => {
-    if (!user) return
-
-    try {
-      await createSampleHealthRecord(user.uid)
-      toast.success("Sample health record created!")
-      const records = await getUserHealthRecords(user.uid)
-      setHealthRecords(records)
-    } catch (error) {
-      console.error("Error creating sample data:", error)
-      toast.error("Failed to create sample data")
-    }
+    toast.error("Sample health record creation is not available.")
   }
-
-  const formatDate = (timestamp: Date | { seconds: number }) => {
-    const date = timestamp instanceof Date ? timestamp : new Date(timestamp.seconds * 1000)
-    return isMobile 
-      ? date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-      : date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
-  }
-
   return (
     <AuthGuard>
       <div className="flex h-screen bg-background text-foreground">

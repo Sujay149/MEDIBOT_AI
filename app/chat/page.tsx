@@ -18,10 +18,12 @@ import {
   createChatSession,
   addMessageToSession,
   subscribeToUserChatSessions,
+  getChatSessionById,
   type ChatSession,
 } from "@/lib/firestore";
 import { toast } from "sonner";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 
 interface PrescriptionAnalysis {
   medications: string[];
@@ -51,23 +53,48 @@ export default function ChatPage() {
   const { user, userProfile } = useAuth();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const searchParams = useSearchParams();
 
   useEffect(() => {
     if (!user) return;
 
+    const sessionId = searchParams?.get("sessionId");
     const unsubscribe = subscribeToUserChatSessions(user.uid, (userSessions) => {
       const normalizedSessions = userSessions.map((session) => ({
         ...session,
         messages: session.messages ?? [],
       }));
       setSessions(normalizedSessions);
-      if (!currentSession && normalizedSessions.length > 0) {
+
+      if (sessionId) {
+        // Load specific session if sessionId is provided in URL
+        const loadSession = async () => {
+          try {
+            const session = await getChatSessionById(sessionId);
+            if (session && session.userId === user.uid) {
+              setCurrentSession(session);
+            } else {
+              toast.error("Chat session not found or access denied");
+              if (normalizedSessions.length > 0) {
+                setCurrentSession(normalizedSessions[0]);
+              }
+            }
+          } catch (error) {
+            console.error("Error loading chat session:", error);
+            toast.error("Failed to load chat session");
+            if (normalizedSessions.length > 0) {
+              setCurrentSession(normalizedSessions[0]);
+            }
+          }
+        };
+        loadSession();
+      } else if (!currentSession && normalizedSessions.length > 0) {
         setCurrentSession(normalizedSessions[0]);
       }
     });
 
     return () => unsubscribe();
-  }, [user, currentSession]);
+  }, [user, searchParams]);
 
   useEffect(() => {
     scrollToBottom();
@@ -228,7 +255,6 @@ export default function ChatPage() {
     if (lowerMessage.includes("diet") || lowerMessage.includes("nutrition")) return "Nutrition Guidance";
     if (lowerMessage.includes("exercise") || lowerMessage.includes("workout")) return "Exercise Consultation";
     if (lowerMessage.includes("sleep") || lowerMessage.includes("insomnia")) return "Sleep Health";
- 
     if (lowerMessage.includes("stress") || lowerMessage.includes("anxiety")) return "Mental Health Support";
     if (lowerMessage.includes("pain")) return "Pain Management";
 
@@ -251,7 +277,7 @@ export default function ChatPage() {
   const generateAIResponse = async (userMessage: string): Promise<string> => {
     try {
       const endpoint = selectedModel === "grok"
-        ? "https://api.x.ai/v1/models/grok:generateContent" // Dummy Grok API
+        ? "https://api.x.ai/v1/models/grok:generateContent"
         : `https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:generateContent`;
 
       const response = await fetch(
@@ -296,7 +322,7 @@ export default function ChatPage() {
   const analyzePrescription = async (file: File): Promise<PrescriptionAnalysis> => {
     try {
       const endpoint = selectedModel === "grok"
-        ? "https://api.x.ai/v1/models/grok:analyzePrescription" // Dummy Grok API
+        ? "https://api.x.ai/v1/models/grok:analyzePrescription"
         : `https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:generateContent`;
 
       const response = await fetch(
@@ -334,7 +360,6 @@ export default function ChatPage() {
       const data = await response.json();
       let responseText = data.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
 
-      // Clean response text by removing markdown code fences and backticks
       responseText = responseText
         .replace(/```json/g, "")
         .replace(/```/g, "")
@@ -361,7 +386,7 @@ export default function ChatPage() {
         medications: ["Error"],
         dosages: ["N/A"],
         instructions: "Failed to analyze prescription.",
-        warnings: ["Pleaseooooooooo try again or consult a healthcare professional."],
+        warnings: ["Please try again or consult a healthcare professional."],
       };
     }
   };
@@ -419,7 +444,7 @@ export default function ChatPage() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-        setSelectedFile(file);
+    setSelectedFile(file);
     setFileName(file.name);
   };
 
@@ -501,7 +526,7 @@ export default function ChatPage() {
                   onClick={() => handleFeedback(msg.id, false)}
                   className="text-muted-foreground hover:text-red-500 h-6 w-6"
                   title="Thumbs Down"
- aria-label="Thumbs Down"
+                  aria-label="Thumbs Down"
                 >
                   <ThumbsDown className="h-4 w-4" />
                 </Button>
@@ -968,7 +993,6 @@ export default function ChatPage() {
                       <RotateCcw className="h-5 w-5 text-muted-foreground" />
                       <span>Recent Chats</span>
                     </div>
-                   
                   </DialogTitle>
                 </DialogHeader>
 

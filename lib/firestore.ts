@@ -13,136 +13,135 @@ import {
   onSnapshot,
   limit,
   type Timestamp,
-} from "firebase/firestore"
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage"
-import { db, storage } from "./firebase"
+} from "firebase/firestore";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { db, storage } from "./firebase";
 
 export interface UserProfile {
-  uid: string
-  email: string
-  displayName?: string
-  photoURL?: string
-  dateOfBirth?: string
-  gender?: string
-  phoneNumber?: string
+  uid: string;
+  email: string;
+  displayName?: string;
+  photoURL?: string;
+  dateOfBirth?: string;
+  gender?: string;
+  phoneNumber?: string;
   emergencyContact?: {
-    name: string
-    phone: string
-    relationship: string
-  }
+    name: string;
+    phone: string;
+    relationship: string;
+  };
   medicalInfo?: {
-    allergies: string[]
-    conditions: string[]
-    bloodType?: string
-  }
-  createdAt: Timestamp | Date
-  updatedAt: Timestamp | Date
+    allergies: string[];
+    conditions: string[];
+    bloodType?: string;
+  };
+  createdAt: Timestamp | Date;
+  updatedAt: Timestamp | Date;
   preferences?: {
-    theme: "dark" | "light"
-    notifications: boolean
-    emailNotifications: boolean
-    medicationReminders: boolean
-    appointmentReminders: boolean
-  }
+    theme: "dark" | "light";
+    notifications: boolean;
+    emailNotifications: boolean;
+    medicationReminders: boolean;
+    appointmentReminders: boolean;
+  };
 }
 
 export interface ChatMessage {
-  id?: string
-  userId: string
+  id?: string;
+  userId: string;
   image?: string;
-  message: string
-  response: string
-  timestamp: Timestamp | Date
-  
-  type: "chat" | "summarizer"
+  message: string;
+  response: string;
+  timestamp: Timestamp | Date;
+  type: "chat" | "summarizer";
 }
 
 export interface ChatSession {
-  id?: string
-  userId: string
-  title: string
-  messages: ChatMessage[]
-  createdAt: Timestamp | Date
-  updatedAt: Timestamp | Date
+  id?: string;
+  userId: string;
+  title: string;
+  messages: ChatMessage[];
+  createdAt: Timestamp | Date;
+  updatedAt: Timestamp | Date;
 }
 
 export interface Medication {
-  id?: string
-  userId: string
-  name: string
-  dosage: string
-  frequency: string
-  startDate: string
-  endDate?: string
-  notes?: string
-  reminderTimes: string[]
-  isActive: boolean
-  enableWhatsApp?: boolean // Renamed from smsEnabled for clarity
-  phoneNumber?: string
-  createdAt: Timestamp | Date
-  updatedAt: Timestamp | Date
+  id?: string;
+  userId: string;
+  name: string;
+  dosage: string;
+  frequency: string;
+  startDate: string;
+  endDate?: string;
+  notes?: string;
+  reminderTimes: string[];
+  isActive: boolean;
+  enableWhatsApp?: boolean;
+  phoneNumber?: string;
+  createdAt: Timestamp | Date;
+  updatedAt: Timestamp | Date;
 }
 
 export interface HealthRecord {
-  id?: string
-  userId: string
-  type: "symptom" | "appointment" | "test_result" | "vital_signs"
-  title: string
-  description: string
-  date: string
-  attachments?: string[]
-  createdAt: Timestamp | Date
+  id?: string;
+  userId: string;
+  type: "symptom" | "appointment" | "test_result" | "vital_signs";
+  title: string;
+  description: string;
+  date: string;
+  attachments?: string[];
+  createdAt: Timestamp | Date;
 }
 
 export interface SummaryRequest {
-  id?: string
-  userId: string
-  originalText: string
-  summary: string
-  category: "symptoms" | "medication" | "diagnosis" | "treatment" | "general"
-  createdAt: Timestamp | Date
+  id?: string;
+  userId: string;
+  originalText: string;
+  summary: string;
+  category: "symptoms" | "medication" | "diagnosis" | "treatment" | "general";
+  createdAt: Timestamp | Date;
 }
 
 export interface PrescriptionAnalysis {
-  id?: string
-  userId: string
-  fileName: string
-  medications: string[]
-  dosages: string[]
-  instructions: string
-  warnings: string[]
-  createdAt: Timestamp | Date
+  id?: string;
+  userId: string;
+  fileName: string;
+  medications: string[];
+  dosages: string[];
+  instructions: string;
+  warnings: string[];
+  createdAt: Timestamp | Date;
 }
 
 export interface NotificationSettings {
-  id?: string
-  userId: string
-  emailNotifications: boolean
-  pushNotifications: boolean
-  medicationReminders: boolean
-  appointmentReminders: boolean
-  reminderTimes: string[]
-  createdAt: Timestamp | Date
+  id?: string;
+  userId: string;
+  emailNotifications: boolean;
+  pushNotifications: boolean;
+  medicationReminders: boolean;
+  appointmentReminders: boolean;
+  reminderTimes: string[];
+  createdAt: Timestamp | Date;
 }
 
 export interface Appointment {
-  id?: string
-  userId: string
-  hospitalName: string
-  hospitalAddress: string
-  hospitalPhone?: string
+  id?: string;
+  userId: string;
+  hospitalName: string;
+  hospitalAddress: string;
+  hospitalPhone?: string;
   hospitalLocation?: {
-    lat: number
-    lng: number
-  }
-  doctorName: string
-  appointmentType: string
-  date: string
-  time: string
-  notes?: string
-  status: "scheduled" | "completed" | "cancelled"
-  createdAt: Timestamp | Date
-  updatedAt: Timestamp | Date
+    lat: number;
+    lng: number;
+  };
+  doctorName: string;
+  appointmentType: string;
+  date: string;
+  time: string;
+  notes?: string;
+  status: "scheduled" | "completed" | "cancelled";
+  createdAt: Timestamp | Date;
+  updatedAt: Timestamp | Date;
 }
 
 // User Profile Functions
@@ -154,7 +153,7 @@ export const createUserProfile = async (
   additionalData?: Partial<UserProfile>,
 ) => {
   try {
-    const userRef = doc(db, "users", uid)
+    const userRef = doc(db, "users", uid);
     const userData: UserProfile = {
       uid,
       email,
@@ -171,83 +170,78 @@ export const createUserProfile = async (
         appointmentReminders: true,
         ...additionalData?.preferences,
       },
-    }
+    };
 
-    await setDoc(userRef, userData)
-
-    // Create default notification settings
-    await createNotificationSettings(uid)
-
-    return userData
+    await setDoc(userRef, userData);
+    await createNotificationSettings(uid);
+    return userData;
   } catch (error) {
-    console.error("Error creating user profile:", error)
-    throw new Error("Failed to create user profile")
+    console.error("Error creating user profile:", error);
+    throw new Error("Failed to create user profile");
   }
-}
+};
 
 export const getUserProfile = async (uid: string): Promise<UserProfile | null> => {
   try {
-    const userRef = doc(db, "users", uid)
-    const userSnap = await getDoc(userRef)
+    const userRef = doc(db, "users", uid);
+    const userSnap = await getDoc(userRef);
 
     if (userSnap.exists()) {
-      return userSnap.data() as UserProfile
+      return userSnap.data() as UserProfile;
     }
-    return null
+    return null;
   } catch (error) {
-    console.error("Error getting user profile:", error)
-    return null
+    console.error("Error getting user profile:", error);
+    return null;
   }
-}
+};
 
 export const updateUserProfile = async (uid: string, data: Partial<UserProfile>) => {
   try {
-    const userRef = doc(db, "users", uid)
+    const userRef = doc(db, "users", uid);
     await updateDoc(userRef, {
       ...data,
       updatedAt: serverTimestamp(),
-    })
+    });
   } catch (error) {
-    console.error("Error updating user profile:", error)
-    throw new Error("Failed to update user profile")
+    console.error("Error updating user profile:", error);
+    throw new Error("Failed to update user profile");
   }
-}
+};
 
 export const uploadProfilePicture = async (userId: string, file: File): Promise<string> => {
   try {
-    const storageRef = ref(storage, `profile-pictures/${userId}/${file.name}`)
-    const snapshot = await uploadBytes(storageRef, file)
-    const downloadURL = await getDownloadURL(snapshot.ref)
+    const storageRef = ref(storage, `profile-pictures/${userId}/${file.name}`);
+    const snapshot = await uploadBytes(storageRef, file);
+    const downloadURL = await getDownloadURL(snapshot.ref);
 
-    // Update user profile with new photo URL
-    await updateUserProfile(userId, { photoURL: downloadURL })
-
-    return downloadURL
+    await updateUserProfile(userId, { photoURL: downloadURL });
+    return downloadURL;
   } catch (error) {
-    console.error("Error uploading profile picture:", error)
-    throw new Error("Failed to upload profile picture")
+    console.error("Error uploading profile picture:", error);
+    throw new Error("Failed to upload profile picture");
   }
-}
+};
 
 // Chat Functions
 export const createChatSession = async (userId: string, title: string) => {
   try {
-    const chatRef = collection(db, "chatSessions")
+    const chatRef = collection(db, "chatSessions");
     const chatData = {
       userId,
       title: title.slice(0, 100),
       messages: [],
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
-    }
+    };
 
-    const docRef = await addDoc(chatRef, chatData)
-    return docRef.id
+    const docRef = await addDoc(chatRef, chatData);
+    return docRef.id;
   } catch (error) {
-    console.error("Error creating chat session:", error)
-    throw new Error("Failed to create chat session")
+    console.error("Error creating chat session:", error);
+    throw new Error("Failed to create chat session");
   }
-}
+};
 
 export const addMessageToSession = async (
   sessionId: string,
@@ -257,70 +251,117 @@ export const addMessageToSession = async (
   type: "chat" | "summarizer" = "chat",
 ) => {
   try {
-    const sessionRef = doc(db, "chatSessions", sessionId)
-    const sessionSnap = await getDoc(sessionRef)
+    const sessionRef = doc(db, "chatSessions", sessionId);
+    const sessionSnap = await getDoc(sessionRef);
 
     if (!sessionSnap.exists()) {
-      throw new Error("Session not found")
+      throw new Error("Session not found");
     }
 
-    const sessionData = sessionSnap.data() as ChatSession
+    const sessionData = sessionSnap.data() as ChatSession;
     const newMessage: ChatMessage = {
       userId,
       message: message.slice(0, 1000),
       response: response.slice(0, 2000),
       type,
       timestamp: new Date(),
-    }
+    };
 
-    const updatedMessages = [...(sessionData.messages || []), newMessage]
+    const updatedMessages = [...(sessionData.messages || []), newMessage];
 
     await updateDoc(sessionRef, {
       messages: updatedMessages,
       updatedAt: serverTimestamp(),
-    })
+    });
 
-    return newMessage
+    return newMessage;
   } catch (error) {
-    console.error("Error adding message to session:", error)
-    throw new Error("Failed to add message")
+    console.error("Error adding message to session:", error);
+    throw new Error("Failed to add message");
   }
-}
+};
 
 export const getUserChatSessions = async (userId: string): Promise<ChatSession[]> => {
   try {
-    const chatsRef = collection(db, "chatSessions")
-    const q = query(chatsRef, where("userId", "==", userId), limit(20))
+    const chatsRef = collection(db, "chatSessions");
+    const q = query(chatsRef, where("userId", "==", userId), limit(20));
 
-    const querySnapshot = await getDocs(q)
+    const querySnapshot = await getDocs(q);
     const sessions = querySnapshot.docs.map(
       (doc) =>
         ({
           id: doc.id,
           ...doc.data(),
         }) as ChatSession,
-    )
+    );
 
     return sessions.sort((a, b) => {
-      const aTime = a.updatedAt instanceof Date ? a.updatedAt.getTime() : (a.updatedAt as any)?.seconds * 1000 || 0
-      const bTime = b.updatedAt instanceof Date ? b.updatedAt.getTime() : (b.updatedAt as any)?.seconds * 1000 || 0
-      return bTime - aTime
-    })
+      const aTime = a.updatedAt instanceof Date ? a.updatedAt.getTime() : (a.updatedAt as any)?.seconds * 1000 || 0;
+      const bTime = b.updatedAt instanceof Date ? b.updatedAt.getTime() : (b.updatedAt as any)?.seconds * 1000 || 0;
+      return bTime - aTime;
+    });
   } catch (error) {
-    console.error("Error getting chat sessions:", error)
-    return []
+    console.error("Error getting chat sessions:", error);
+    return [];
   }
-}
+};
+
+export const getChatSessionById = async (sessionId: string) => {
+  try {
+    const docRef = doc(db, "chatSessions", sessionId);
+    const docSnap = await getDoc(docRef);
+
+    if (docSnap.exists()) {
+      return { id: docSnap.id, ...docSnap.data() } as ChatSession;
+    }
+    return null;
+  } catch (error) {
+    console.error("Error getting chat session by ID:", error);
+    throw new Error("Failed to get chat session");
+  }
+};
 
 export const deleteChatSession = async (sessionId: string) => {
   try {
-    const sessionRef = doc(db, "chatSessions", sessionId)
-    await deleteDoc(sessionRef)
+    const sessionRef = doc(db, "chatSessions", sessionId);
+    await deleteDoc(sessionRef);
   } catch (error) {
-    console.error("Error deleting chat session:", error)
-    throw new Error("Failed to delete chat session")
+    console.error("Error deleting chat session:", error);
+    throw new Error("Failed to delete chat session");
   }
-}
+};
+
+export const subscribeToUserChatSessions = (
+  userId: string,
+  callback: (sessions: ChatSession[]) => void,
+) => {
+  try {
+    const chatsRef = collection(db, "chatSessions");
+    const q = query(chatsRef, where("userId", "==", userId), limit(20));
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const sessions = snapshot.docs
+        .map(
+          (doc) =>
+            ({
+              id: doc.id,
+              ...doc.data(),
+            }) as ChatSession,
+        )
+        .sort((a, b) => {
+          const aTime = a.updatedAt instanceof Date ? a.updatedAt.getTime() : (a.updatedAt as any)?.seconds * 1000 || 0;
+          const bTime = b.updatedAt instanceof Date ? b.updatedAt.getTime() : (b.updatedAt as any)?.seconds * 1000 || 0;
+          return bTime - aTime;
+        });
+      callback(sessions);
+    });
+
+    return unsubscribe;
+  } catch (error) {
+    console.error("Error subscribing to chat sessions:", error);
+    return () => {};
+  }
+};
 
 // Prescription Analysis Functions
 export const analyzePrescription = async (
@@ -329,7 +370,6 @@ export const analyzePrescription = async (
   description: string,
 ): Promise<PrescriptionAnalysis> => {
   try {
-    // Simulate AI analysis - in real implementation, this would call an AI service
     const analysis: Omit<PrescriptionAnalysis, "id"> = {
       userId,
       fileName,
@@ -342,17 +382,52 @@ export const analyzePrescription = async (
         "Avoid alcohol while taking Amoxicillin",
       ],
       createdAt: serverTimestamp() as Timestamp,
-    }
+    };
 
-    const analysisRef = collection(db, "prescriptionAnalyses")
-    const docRef = await addDoc(analysisRef, analysis)
+    const analysisRef = collection(db, "prescriptionAnalyses");
+    const docRef = await addDoc(analysisRef, analysis);
 
-    return { id: docRef.id, ...analysis }
+    return { id: docRef.id, ...analysis };
   } catch (error) {
-    console.error("Error analyzing prescription:", error)
-    throw new Error("Failed to analyze prescription")
+    console.error("Error analyzing prescription:", error);
+    throw new Error("Failed to analyze prescription");
   }
-}
+};
+
+export const getUserPrescriptionAnalyses = async (userId: string): Promise<PrescriptionAnalysis[]> => {
+  try {
+    const analysesRef = collection(db, "prescriptionAnalyses");
+    const q = query(analysesRef, where("userId", "==", userId), limit(20));
+
+    const querySnapshot = await getDocs(q);
+    const analyses = querySnapshot.docs.map(
+      (doc) =>
+        ({
+          id: doc.id,
+          ...doc.data(),
+        }) as PrescriptionAnalysis,
+    );
+
+    return analyses.sort((a, b) => {
+      const aTime = a.createdAt instanceof Date ? a.createdAt.getTime() : (a.createdAt as any)?.seconds * 1000 || 0;
+      const bTime = b.createdAt instanceof Date ? b.createdAt.getTime() : (b.createdAt as any)?.seconds * 1000 || 0;
+      return bTime - aTime;
+    });
+  } catch (error) {
+    console.error("Error getting prescription analyses:", error);
+    return [];
+  }
+};
+
+export const deletePrescriptionAnalysis = async (analysisId: string) => {
+  try {
+    const analysisRef = doc(db, "prescriptionAnalyses", analysisId);
+    await deleteDoc(analysisRef);
+  } catch (error) {
+    console.error("Error deleting prescription analysis:", error);
+    throw new Error("Failed to delete prescription analysis");
+  }
+};
 
 // Medication Functions
 export const addMedication = async (
@@ -360,7 +435,7 @@ export const addMedication = async (
   medication: Omit<Medication, "id" | "userId" | "createdAt" | "updatedAt">,
 ) => {
   try {
-    const medicationRef = collection(db, "medications")
+    const medicationRef = collection(db, "medications");
     const medicationData: Omit<Medication, "id"> = {
       userId,
       ...medication,
@@ -369,464 +444,413 @@ export const addMedication = async (
       phoneNumber: medication.enableWhatsApp ? medication.phoneNumber : undefined,
       createdAt: serverTimestamp() as Timestamp,
       updatedAt: serverTimestamp() as Timestamp,
-    }
+    };
 
-    const docRef = await addDoc(medicationRef, medicationData)
+    const docRef = await addDoc(medicationRef, medicationData);
 
-    // Schedule medication reminders
     if (medication.reminderTimes.length) {
-      await scheduleMedicationReminders(userId, docRef.id, medication.reminderTimes, medication.enableWhatsApp, medication.phoneNumber)
+      await scheduleMedicationReminders(userId, docRef.id, medication.reminderTimes, medication.enableWhatsApp, medication.phoneNumber);
     }
 
-    return docRef.id
+    return docRef.id;
   } catch (error) {
-    console.error("Error adding medication:", error)
-    throw new Error("Failed to add medication")
+    console.error("Error adding medication:", error);
+    throw new Error("Failed to add medication");
   }
-}
+};
 
-export async function updateMedication(medicationId: string, data: Partial<Medication>) {
-  const docRef = doc(db, "medications", medicationId);
-  const updateData: Record<string, any> = {};
-  for (const [key, value] of Object.entries(data)) {
-    if (value !== undefined) {
-      updateData[key] = value === null ? null : value;
+export const updateMedication = async (medicationId: string, data: Partial<Medication>) => {
+  try {
+    const docRef = doc(db, "medications", medicationId);
+    const updateData: Record<string, any> = {};
+    for (const [key, value] of Object.entries(data)) {
+      if (value !== undefined) {
+        updateData[key] = value === null ? null : value;
+      }
     }
+    updateData.updatedAt = serverTimestamp();
+    await updateDoc(docRef, updateData);
+  } catch (error) {
+    console.error("Error updating medication:", error);
+    throw new Error("Failed to update medication");
   }
-  updateData.updatedAt = new Date().toISOString();
-  await updateDoc(docRef, updateData);
-}
+};
 
 export const deleteMedication = async (medicationId: string) => {
   try {
-    const medicationRef = doc(db, "medications", medicationId)
-    await deleteDoc(medicationRef)
+    const medicationRef = doc(db, "medications", medicationId);
+    await deleteDoc(medicationRef);
 
-    // Delete associated reminders
-    const remindersRef = collection(db, "medicationReminders")
-    const q = query(remindersRef, where("medicationId", "==", medicationId))
-    const querySnapshot = await getDocs(q)
+    const remindersRef = collection(db, "medicationReminders");
+    const q = query(remindersRef, where("medicationId", "==", medicationId));
+    const querySnapshot = await getDocs(q);
     for (const doc of querySnapshot.docs) {
-      await deleteDoc(doc.ref)
+      await deleteDoc(doc.ref);
     }
   } catch (error) {
-    console.error("Error deleting medication:", error)
-    throw new Error("Failed to delete medication")
+    console.error("Error deleting medication:", error);
+    throw new Error("Failed to delete medication");
   }
-}
+};
 
 export const getUserMedications = async (userId: string): Promise<Medication[]> => {
   try {
-    const medicationsRef = collection(db, "medications")
-    const q = query(medicationsRef, where("userId", "==", userId), limit(50))
+    const medicationsRef = collection(db, "medications");
+    const q = query(medicationsRef, where("userId", "==", userId), limit(50));
 
-    const querySnapshot = await getDocs(q)
-    const medications = querySnapshot.docs
-      .map(
-        (doc) =>
-          ({
-            id: doc.id,
-            ...doc.data(),
-          }) as Medication,
-      )
-      .filter((med) => med.isActive)
+    const querySnapshot = await getDocs(q);
+    const medications = querySnapshot.docs.map(
+      (doc) =>
+        ({
+          id: doc.id,
+          ...doc.data(),
+        }) as Medication,
+    );
 
     return medications.sort((a, b) => {
-      const aTime = a.createdAt instanceof Date ? a.createdAt.getTime() : (a.createdAt as any)?.seconds * 1000 || 0
-      const bTime = b.createdAt instanceof Date ? b.createdAt.getTime() : (b.createdAt as any)?.seconds * 1000 || 0
-      return bTime - aTime
-    })
+      const aTime = a.updatedAt instanceof Date ? a.updatedAt.getTime() : (a.updatedAt as any)?.seconds * 1000 || 0;
+      const bTime = b.updatedAt instanceof Date ? b.updatedAt.getTime() : (b.updatedAt as any)?.seconds * 1000 || 0;
+      return bTime - aTime;
+    });
   } catch (error) {
-    console.error("Error getting medications:", error)
-    return []
+    console.error("Error getting medications:", error);
+    return [];
   }
-}
-
-export const subscribeToUserMedications = (userId: string, callback: (medications: Medication[]) => void) => {
-  const medicationsRef = collection(db, "medications")
-  const q = query(medicationsRef, where("userId", "==", userId), limit(50))
-
-  return onSnapshot(
-    q,
-    (querySnapshot) => {
-      try {
-        const medications = querySnapshot.docs
-          .map(
-            (doc) =>
-              ({
-                id: doc.id,
-                ...doc.data(),
-              }) as Medication,
-          )
-          .filter((med) => med.isActive)
-
-        const sortedMedications = medications.sort((a, b) => {
-          const aTime = a.createdAt instanceof Date ? a.createdAt.getTime() : (a.createdAt as any)?.seconds * 1000 || 0
-          const bTime = b.createdAt instanceof Date ? b.createdAt.getTime() : (b.createdAt as any)?.seconds * 1000 || 0
-          return bTime - aTime
-        })
-
-        callback(sortedMedications)
-      } catch (error) {
-        console.error("Error processing medications:", error)
-        callback([])
-      }
-    },
-    (error) => {
-      console.error("Error in medications listener:", error)
-      callback([])
-    },
-  )
-}
-
-// Notification Functions
-export const createNotificationSettings = async (userId: string) => {
-  try {
-    const notificationRef = collection(db, "notificationSettings")
-    const notificationData: Omit<NotificationSettings, "id"> = {
-      userId,
-      emailNotifications: true,
-      pushNotifications: true,
-      medicationReminders: true,
-      appointmentReminders: true,
-      reminderTimes: ["09:00", "21:00"],
-      createdAt: serverTimestamp() as Timestamp,
-    }
-
-    const docRef = await addDoc(notificationRef, notificationData)
-    return docRef.id
-  } catch (error) {
-    console.error("Error creating notification settings:", error)
-    throw new Error("Failed to create notification settings")
-  }
-}
+};
 
 export const scheduleMedicationReminders = async (
   userId: string,
   medicationId: string,
   reminderTimes: string[],
   enableWhatsApp?: boolean,
-  phoneNumber?: string
+  phoneNumber?: string,
 ) => {
   try {
-    // Store reminder schedule
-    const reminderRef = collection(db, "medicationReminders")
-    const reminderData = {
-      userId,
-      medicationId,
-      reminderTimes,
-      enableWhatsApp: enableWhatsApp || false,
-      phoneNumber: enableWhatsApp ? phoneNumber : null,
-      isActive: true,
-      createdAt: serverTimestamp(),
-    }
-
-    await addDoc(reminderRef, reminderData)
-
-    // Request notification permission if not already granted
-    if ("Notification" in window && Notification.permission === "default") {
-      await Notification.requestPermission()
-    }
-
-    // Schedule WhatsApp reminders if enabled
-    if (enableWhatsApp && phoneNumber) {
-      for (const time of reminderTimes) {
-        // In a real implementation, this would schedule a server-side task (e.g., using Cloud Functions)
-        // For client-side demo, we'll log the intent
-        console.log(`Scheduling WhatsApp reminder for ${phoneNumber} at ${time}`)
-      }
+    const remindersRef = collection(db, "medicationReminders");
+    for (const time of reminderTimes) {
+      const reminderData = {
+        userId,
+        medicationId,
+        time,
+        enableWhatsApp: enableWhatsApp || false,
+        phoneNumber: enableWhatsApp ? phoneNumber : null,
+        createdAt: serverTimestamp(),
+      };
+      await addDoc(remindersRef, reminderData);
     }
   } catch (error) {
-    console.error("Error scheduling medication reminders:", error)
-    throw new Error("Failed to schedule reminders")
+    console.error("Error scheduling medication reminders:", error);
+    throw new Error("Failed to schedule medication reminders");
   }
-}
+};
 
-export const sendMedicationReminder = async (userId: string, medicationName: string, phoneNumber?: string, enableWhatsApp?: boolean) => {
-  try {
-    // Browser notification
-    if ("Notification" in window && Notification.permission === "granted") {
-      new Notification("Medication Reminder", {
-        body: `Time to take your ${medicationName}`,
-        icon: "/logo.png",
-        badge: "/logo.png",
-        tag: "medication-reminder",
-      })
-    }
-
-    // Send WhatsApp notification if enabled
-    if (enableWhatsApp && phoneNumber) {
-      const message = `Time to take your ${medicationName}`
-      await fetch("/api/send-whatsapp", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          to: phoneNumber,
-          message,
-        }),
-      })
-    }
-  } catch (error) {
-    console.error("Error sending medication reminder:", error)
-  }
-}
-
-// Appointment Functions
-export const addAppointment = async (
+// Health Record Functions
+export const addHealthRecord = async (
   userId: string,
-  appointment: Omit<Appointment, "id" | "userId" | "status" | "createdAt" | "updatedAt">,
+  record: Omit<HealthRecord, "id" | "userId" | "createdAt">,
 ) => {
   try {
-    const appointmentRef = collection(db, "appointments")
-    const appointmentData: Omit<Appointment, "id"> = {
-      userId,
-      hospitalName: appointment.hospitalName,
-      hospitalAddress: appointment.hospitalAddress,
-      hospitalPhone: appointment.hospitalPhone || "",
-      hospitalLocation: appointment.hospitalLocation || undefined,
-      doctorName: appointment.doctorName,
-      appointmentType: appointment.appointmentType,
-      date: appointment.date,
-      time: appointment.time,
-      notes: appointment.notes || "",
-      status: "scheduled",
-      createdAt: serverTimestamp() as Timestamp,
-      updatedAt: serverTimestamp() as Timestamp,
-    }
-
-    const docRef = await addDoc(appointmentRef, appointmentData)
-    return docRef.id
-  } catch (error) {
-    console.error("Error adding appointment:", error)
-    throw new Error(`Failed to add appointment: ${error instanceof Error ? error.message : String(error)}`)
-  }
-}
-
-export const updateAppointment = async (appointmentId: string, data: Partial<Appointment>) => {
-  try {
-    const appointmentRef = doc(db, "appointments", appointmentId)
-    await updateDoc(appointmentRef, {
-      ...data,
-      updatedAt: serverTimestamp(),
-    })
-  } catch (error) {
-    console.error("Error updating appointment:", error)
-    throw new Error("Failed to update appointment")
-  }
-}
-
-export const deleteAppointment = async (appointmentId: string) => {
-  try {
-    const appointmentRef = doc(db, "appointments", appointmentId)
-    await deleteDoc(appointmentRef)
-  } catch (error) {
-    console.error("Error deleting appointment:", error)
-    throw new Error("Failed to delete appointment")
-  }
-}
-
-export const subscribeToUserAppointments = (userId: string, callback: (appointments: Appointment[]) => void) => {
-  const appointmentsRef = collection(db, "appointments")
-  const q = query(appointmentsRef, where("userId", "==", userId), limit(50))
-
-  return onSnapshot(
-    q,
-    (querySnapshot) => {
-      try {
-        const appointments = querySnapshot.docs.map(
-          (doc) =>
-            ({
-              id: doc.id,
-              ...doc.data(),
-            }) as Appointment,
-        )
-
-        const sortedAppointments = appointments.sort((a, b) => {
-          const aTime = new Date(`${a.date}T${a.time}`).getTime()
-          const bTime = new Date(`${b.date}T${b.time}`).getTime()
-          return bTime - aTime
-        })
-
-        callback(sortedAppointments)
-      } catch (error) {
-        console.error("Error processing appointments:", error)
-        callback([])
-      }
-    },
-    (error) => {
-      console.error("Error in appointments listener:", error)
-      callback([])
-    },
-  )
-}
-
-export const getUserAppointments = async (userId: string): Promise<Appointment[]> => {
-  try {
-    const appointmentsRef = collection(db, "appointments")
-    const q = query(appointmentsRef, where("userId", "==", userId), limit(50))
-
-    const querySnapshot = await getDocs(q)
-    const appointments = querySnapshot.docs.map(
-      (doc) =>
-        ({
-          id: doc.id,
-          ...doc.data(),
-        }) as Appointment,
-    )
-
-    return appointments.sort((a, b) => {
-      const aTime = new Date(`${a.date}T${a.time}`).getTime()
-      const bTime = new Date(`${b.date}T${b.time}`).getTime()
-      return bTime - aTime
-    })
-  } catch (error) {
-    console.error("Error getting appointments:", error)
-    return []
-  }
-}
-
-// Health Records Functions
-export const addHealthRecord = async (userId: string, record: Omit<HealthRecord, "id" | "userId" | "createdAt">) => {
-  try {
-    const recordRef = collection(db, "healthRecords")
+    const recordsRef = collection(db, "healthRecords");
     const recordData: Omit<HealthRecord, "id"> = {
       userId,
       ...record,
       createdAt: serverTimestamp() as Timestamp,
-    }
+    };
 
-    const docRef = await addDoc(recordRef, recordData)
-    return docRef.id
+    const docRef = await addDoc(recordsRef, recordData);
+    return docRef.id;
   } catch (error) {
-    console.error("Error adding health record:", error)
-    throw new Error("Failed to add health record")
+    console.error("Error adding health record:", error);
+    throw new Error("Failed to add health record");
   }
-}
+};
 
 export const getUserHealthRecords = async (userId: string): Promise<HealthRecord[]> => {
   try {
-    const recordsRef = collection(db, "healthRecords")
-    const q = query(recordsRef, where("userId", "==", userId), limit(50))
+    const recordsRef = collection(db, "healthRecords");
+    const q = query(recordsRef, where("userId", "==", userId), limit(50));
 
-    const querySnapshot = await getDocs(q)
+    const querySnapshot = await getDocs(q);
     const records = querySnapshot.docs.map(
       (doc) =>
         ({
           id: doc.id,
           ...doc.data(),
         }) as HealthRecord,
-    )
+    );
 
     return records.sort((a, b) => {
-      const aTime = a.createdAt instanceof Date ? a.createdAt.getTime() : (a.createdAt as any)?.seconds * 1000 || 0
-      const bTime = b.createdAt instanceof Date ? b.createdAt.getTime() : (b.createdAt as any)?.seconds * 1000 || 0
-      return bTime - aTime
-    })
+      const aTime = new Date(a.date).getTime();
+      const bTime = new Date(b.date).getTime();
+      return bTime - aTime;
+    });
   } catch (error) {
-    console.error("Error getting health records:", error)
-    return []
+    console.error("Error getting health records:", error);
+    return [];
   }
-}
+};
 
-// Summary Functions
-export const addSummaryRequest = async (
+export const updateHealthRecord = async (recordId: string, data: Partial<HealthRecord>) => {
+  try {
+    const docRef = doc(db, "healthRecords", recordId);
+    const updateData: Record<string, any> = {};
+    for (const [key, value] of Object.entries(data)) {
+      if (value !== undefined) {
+        updateData[key] = value === null ? null : value;
+      }
+    }
+    await updateDoc(docRef, updateData);
+  } catch (error) {
+    console.error("Error updating health record:", error);
+    throw new Error("Failed to update health record");
+  }
+};
+
+export const deleteHealthRecord = async (recordId: string) => {
+  try {
+    const recordRef = doc(db, "healthRecords", recordId);
+    await deleteDoc(recordRef);
+  } catch (error) {
+    console.error("Error deleting health record:", error);
+    throw new Error("Failed to delete health record");
+  }
+};
+
+// Summary Request Functions
+export const createSummaryRequest = async (
   userId: string,
-  originalText: string,
-  summary: string,
-  category: "symptoms" | "medication" | "diagnosis" | "treatment" | "general",
+  request: Omit<SummaryRequest, "id" | "userId" | "createdAt">,
 ) => {
   try {
-    const summaryRef = collection(db, "summaries")
+    const summariesRef = collection(db, "summaryRequests");
     const summaryData: Omit<SummaryRequest, "id"> = {
       userId,
-      originalText: originalText.slice(0, 5000),
-      summary: summary.slice(0, 2000),
-      category,
+      ...request,
       createdAt: serverTimestamp() as Timestamp,
-    }
+    };
 
-    const docRef = await addDoc(summaryRef, summaryData)
-    return docRef.id
+    const docRef = await addDoc(summariesRef, summaryData);
+    return docRef.id;
   } catch (error) {
-    console.error("Error adding summary:", error)
-    throw new Error("Failed to save summary")
+    console.error("Error creating summary request:", error);
+    throw new Error("Failed to create summary request");
   }
-}
+};
 
-export const getUserSummaries = async (userId: string): Promise<SummaryRequest[]> => {
+export const getUserSummaryRequests = async (userId: string): Promise<SummaryRequest[]> => {
   try {
-    const summariesRef = collection(db, "summaries")
-    const q = query(summariesRef, where("userId", "==", userId), limit(20))
+    const summariesRef = collection(db, "summaryRequests");
+    const q = query(summariesRef, where("userId", "==", userId), limit(50));
 
-    const querySnapshot = await getDocs(q)
+    const querySnapshot = await getDocs(q);
     const summaries = querySnapshot.docs.map(
       (doc) =>
         ({
           id: doc.id,
           ...doc.data(),
         }) as SummaryRequest,
-    )
+    );
 
     return summaries.sort((a, b) => {
-      const aTime = a.createdAt instanceof Date ? a.createdAt.getTime() : (a.createdAt as any)?.seconds * 1000 || 0
-      const bTime = b.createdAt instanceof Date ? b.createdAt.getTime() : (b.createdAt as any)?.seconds * 1000 || 0
-      return bTime - aTime
-    })
+      const aTime = a.createdAt instanceof Date ? a.createdAt.getTime() : (a.createdAt as any)?.seconds * 1000 || 0;
+      const bTime = b.createdAt instanceof Date ? b.createdAt.getTime() : (b.createdAt as any)?.seconds * 1000 || 0;
+      return bTime - aTime;
+    });
   } catch (error) {
-    console.error("Error getting summaries:", error)
-    return []
+    console.error("Error getting summary requests:", error);
+    return [];
   }
-}
+};
 
-// Real-time listeners
-export const subscribeToUserChatSessions = (userId: string, callback: (sessions: ChatSession[]) => void) => {
-  const chatsRef = collection(db, "chatSessions")
-  const q = query(chatsRef, where("userId", "==", userId), limit(20))
+export const deleteSummaryRequest = async (summaryId: string) => {
+  try {
+    const summaryRef = doc(db, "summaryRequests", summaryId);
+    await deleteDoc(summaryRef);
+  } catch (error) {
+    console.error("Error deleting summary request:", error);
+    throw new Error("Failed to delete summary request");
+  }
+};
 
-  return onSnapshot(
-    q,
-    (querySnapshot) => {
-      try {
-        const sessions = querySnapshot.docs.map(
+// Notification Settings Functions
+export const createNotificationSettings = async (userId: string) => {
+  try {
+    const settingsRef = doc(db, "notificationSettings", userId);
+    const settingsData: NotificationSettings = {
+      userId,
+      emailNotifications: true,
+      pushNotifications: true,
+      medicationReminders: true,
+      appointmentReminders: true,
+      reminderTimes: ["09:00", "13:00", "18:00"],
+      createdAt: serverTimestamp() as Timestamp,
+    };
+
+    await setDoc(settingsRef, settingsData);
+    return settingsData;
+  } catch (error) {
+    console.error("Error creating notification settings:", error);
+    throw new Error("Failed to create notification settings");
+  }
+};
+
+export const getNotificationSettings = async (userId: string): Promise<NotificationSettings | null> => {
+  try {
+    const settingsRef = doc(db, "notificationSettings", userId);
+    const settingsSnap = await getDoc(settingsRef);
+
+    if (settingsSnap.exists()) {
+      return settingsSnap.data() as NotificationSettings;
+    }
+    return null;
+  } catch (error) {
+    console.error("Error getting notification settings:", error);
+    return null;
+  }
+};
+
+export const updateNotificationSettings = async (userId: string, data: Partial<NotificationSettings>) => {
+  try {
+    const settingsRef = doc(db, "notificationSettings", userId);
+    const updateData: Record<string, any> = {};
+    for (const [key, value] of Object.entries(data)) {
+      if (value !== undefined) {
+        updateData[key] = value === null ? null : value;
+      }
+    }
+    await updateDoc(settingsRef, updateData);
+  } catch (error) {
+    console.error("Error updating notification settings:", error);
+    throw new Error("Failed to update notification settings");
+  }
+};
+
+// Appointment Functions
+export const addAppointment = async (
+  userId: string,
+  appointment: Omit<Appointment, "id" | "userId" | "createdAt" | "updatedAt">,
+) => {
+  try {
+    const appointmentsRef = collection(db, "appointments");
+    const appointmentData: Omit<Appointment, "id"> = {
+      userId,
+      ...appointment,
+      status: appointment.status || "scheduled",
+      createdAt: serverTimestamp() as Timestamp,
+      updatedAt: serverTimestamp() as Timestamp,
+    };
+
+    const docRef = await addDoc(appointmentsRef, appointmentData);
+    return docRef.id;
+  } catch (error) {
+    console.error("Error adding appointment:", error);
+    throw new Error("Failed to add appointment");
+  }
+};
+
+export const getUserAppointments = async (userId: string): Promise<Appointment[]> => {
+  try {
+    const appointmentsRef = collection(db, "appointments");
+    const q = query(appointmentsRef, where("userId", "==", userId), limit(50));
+
+    const querySnapshot = await getDocs(q);
+    const appointments = querySnapshot.docs.map(
+      (doc) =>
+        ({
+          id: doc.id,
+          ...doc.data(),
+        }) as Appointment,
+    );
+
+    return appointments.sort((a, b) => {
+      const aTime = new Date(`${a.date} ${a.time}`).getTime();
+      const bTime = new Date(`${b.date} ${b.time}`).getTime();
+      return bTime - aTime;
+    });
+  } catch (error) {
+    console.error("Error getting appointments:", error);
+    return [];
+  }
+};
+
+export const updateAppointment = async (appointmentId: string, data: Partial<Appointment>) => {
+  try {
+    const docRef = doc(db, "appointments", appointmentId);
+    const updateData: Record<string, any> = {};
+    for (const [key, value] of Object.entries(data)) {
+      if (value !== undefined) {
+        updateData[key] = value === null ? null : value;
+      }
+    }
+    updateData.updatedAt = serverTimestamp();
+    await updateDoc(docRef, updateData);
+  } catch (error) {
+    console.error("Error updating appointment:", error);
+    throw new Error("Failed to update appointment");
+  }
+};
+
+export const deleteAppointment = async (appointmentId: string) => {
+  try {
+    const appointmentRef = doc(db, "appointments", appointmentId);
+    await deleteDoc(appointmentRef);
+  } catch (error) {
+    console.error("Error deleting appointment:", error);
+    throw new Error("Failed to delete appointment");
+  }
+};
+
+// Real-time Subscription for Appointments
+export const subscribeToUserAppointments = (
+  userId: string,
+  callback: (appointments: Appointment[]) => void,
+) => {
+  try {
+    const appointmentsRef = collection(db, "appointments");
+    const q = query(appointmentsRef, where("userId", "==", userId), limit(50));
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const appointments = snapshot.docs
+        .map(
           (doc) =>
             ({
               id: doc.id,
               ...doc.data(),
-            }) as ChatSession,
+            }) as Appointment,
         )
+        .sort((a, b) => {
+          const aTime = new Date(`${a.date} ${a.time}`).getTime();
+          const bTime = new Date(`${b.date} ${b.time}`).getTime();
+          return bTime - aTime;
+        });
+      callback(appointments);
+    });
 
-        const sortedSessions = sessions.sort((a, b) => {
-          const aTime = a.updatedAt instanceof Date ? a.updatedAt.getTime() : (a.updatedAt as any)?.seconds * 1000 || 0
-          const bTime = b.updatedAt instanceof Date ? b.updatedAt.getTime() : (b.updatedAt as any)?.seconds * 1000 || 0
-          return bTime - aTime
-        })
+    return unsubscribe;
+  } catch (error) {
+    console.error("Error subscribing to appointments:", error);
+    return () => {};
+  }
+};
 
-        callback(sortedSessions)
-      } catch (error) {
-        console.error("Error processing chat sessions:", error)
-        callback([])
-      }
-    },
-    (error) => {
-      console.error("Error in chat sessions listener:", error)
-      callback([])
-    },
-  )
-}
-
-// Helper function to create sample data for testing
-export const createSampleHealthRecord = async (userId: string) => {
+// File Upload for Health Records
+export const uploadHealthRecordAttachment = async (userId: string, recordId: string, file: File): Promise<string> => {
   try {
-    const sampleRecord: Omit<HealthRecord, "id" | "userId" | "createdAt"> = {
-      type: "symptom",
-      title: "Sample Health Record",
-      description: "This is a sample health record for testing purposes",
-      date: new Date().toISOString().split("T")[0],
+    const storageRef = ref(storage, `healthRecords/${userId}/${recordId}/${file.name}`);
+    const snapshot = await uploadBytes(storageRef, file);
+    const downloadURL = await getDownloadURL(snapshot.ref);
+
+    const recordRef = doc(db, "healthRecords", recordId);
+    const recordSnap = await getDoc(recordRef);
+    if (recordSnap.exists()) {
+      const recordData = recordSnap.data() as HealthRecord;
+      const updatedAttachments = [...(recordData.attachments || []), downloadURL];
+      await updateDoc(recordRef, { attachments: updatedAttachments });
     }
 
-    return addHealthRecord(userId, sampleRecord)
+    return downloadURL;
   } catch (error) {
-    console.error("Error creating sample health record:", error)
-    throw new Error("Failed to create sample health record")
+    console.error("Error uploading health record attachment:", error);
+    throw new Error("Failed to upload health record attachment");
   }
-}
+};
