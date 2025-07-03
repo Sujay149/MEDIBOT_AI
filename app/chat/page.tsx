@@ -12,18 +12,19 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Menu, Camera, RotateCcw, Plus, Send, Upload, X, FileText, Pill, AlertCircle, Copy, ThumbsUp, ThumbsDown, Edit } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import {
   createChatSession,
   addMessageToSession,
   subscribeToUserChatSessions,
   getChatSessionById,
+  updateChatSessionTitle,
   type ChatSession,
 } from "@/lib/firestore";
 import { toast } from "sonner";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { ThumbsDown, ThumbsUp, Copy, Edit, Menu, Plus, Camera, RotateCcw, Upload, Send, X, FileText, Pill, AlertCircle } from "lucide-react";
 
 interface PrescriptionAnalysis {
   medications: string[];
@@ -58,7 +59,7 @@ export default function ChatPage() {
   useEffect(() => {
     if (!user) return;
 
-    const sessionId = searchParams?.get("sessionId");
+    const sessionId = searchParams ? searchParams.get("sessionId") : null;
     const unsubscribe = subscribeToUserChatSessions(user.uid, (userSessions) => {
       const normalizedSessions = userSessions.map((session) => ({
         ...session,
@@ -67,7 +68,6 @@ export default function ChatPage() {
       setSessions(normalizedSessions);
 
       if (sessionId) {
-        // Load specific session if sessionId is provided in URL
         const loadSession = async () => {
           try {
             const session = await getChatSessionById(sessionId);
@@ -159,6 +159,10 @@ export default function ChatPage() {
           updatedAt: new Date(),
         };
         setCurrentSession(sessionToUse);
+      } else if (sessionToUse.title === "New Chat" && message.trim()) {
+        const smartTitle = generateChatTitle(message);
+        await updateChatSessionTitle(sessionToUse.id!, smartTitle);
+        setCurrentSession((prev) => prev ? { ...prev, title: smartTitle } : prev);
       }
 
       let botResponse = "";
@@ -221,6 +225,11 @@ export default function ChatPage() {
           );
           await addMessageToSession(sessionId, user.uid, editedMessage, botResponse, "chat");
           setCurrentSession((prev) => (prev ? { ...prev, messages: updatedMessages } : prev));
+          if (currentSession?.messages[0]?.id === messageId) {
+            const smartTitle = generateChatTitle(editedMessage);
+            await updateChatSessionTitle(sessionId, smartTitle);
+            setCurrentSession((prev) => (prev ? { ...prev, title: smartTitle } : prev));
+          }
           toast.success("Message updated!");
         }
       } catch (error) {
@@ -244,24 +253,38 @@ export default function ChatPage() {
 
   const handleFeedback = (messageId: string, isPositive: boolean) => {
     toast.success(isPositive ? "Thanks for the thumbs up!" : "Thanks for the feedback!");
-    // Future: Log feedback to Firestore or analytics
   };
 
   const generateChatTitle = (firstMessage: string): string => {
-    const lowerMessage = firstMessage.toLowerCase();
-    if (lowerMessage.includes("headache") || lowerMessage.includes("migraine")) return "Headache Consultation";
-    if (lowerMessage.includes("fever") || lowerMessage.includes("temperature")) return "Fever Assessment";
-    if (lowerMessage.includes("medication") || lowerMessage.includes("medicine")) return "Medication Inquiry";
-    if (lowerMessage.includes("diet") || lowerMessage.includes("nutrition")) return "Nutrition Guidance";
-    if (lowerMessage.includes("exercise") || lowerMessage.includes("workout")) return "Exercise Consultation";
-    if (lowerMessage.includes("sleep") || lowerMessage.includes("insomnia")) return "Sleep Health";
-    if (lowerMessage.includes("stress") || lowerMessage.includes("anxiety")) return "Mental Health Support";
-    if (lowerMessage.includes("pain")) return "Pain Management";
+    const lowerMessage = firstMessage.toLowerCase().trim();
+    if (lowerMessage.length === 0) return "General Discussion";
 
-    const words = firstMessage.split(" ").filter((word) => word.length > 3);
-    if (words.length > 0) return `${words[0].charAt(0).toUpperCase() + words[0].slice(1)} Discussion`;
+    const words = lowerMessage.split(/\s+/).filter(word => word.length > 3);
+    if (words.length === 0) return "General Discussion";
 
-    return "Health Consultation";
+    const healthKeywords = [
+      { keywords: ["headache", "migraine"], title: "Headache Inquiry" },
+      { keywords: ["fever", "temperature"], title: "Fever Inquiry" },
+      { keywords: ["medication", "medicine", "prescription"], title: "Medication Inquiry" },
+      { keywords: ["diet", "nutrition", "food"], title: "Nutrition Inquiry" },
+      { keywords: ["exercise", "workout", "fitness"], title: "Exercise Inquiry" },
+      { keywords: ["sleep", "insomnia"], title: "Sleep Inquiry" },
+      { keywords: ["stress", "anxiety", "mental"], title: "Mental Health Inquiry" },
+      { keywords: ["pain"], title: "Pain Inquiry" },
+      { keywords: ["symptom", "symptoms"], title: "Symptom Inquiry" },
+      { keywords: ["allergy", "allergies"], title: "Allergy Inquiry" },
+      { keywords: ["injury", "injuries"], title: "Injury Inquiry" },
+      { keywords: ["disease", "condition"], title: "Condition Inquiry" },
+    ];
+
+    for (const { keywords, title } of healthKeywords) {
+      if (keywords.some(keyword => lowerMessage.includes(keyword))) {
+        return title;
+      }
+    }
+
+    const keyPhrase = words.slice(0, 2).map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(" ");
+    return `${keyPhrase} Discussion`;
   };
 
   const sendMessageNotification = (userMessage: string, botResponse: string) => {
@@ -311,7 +334,6 @@ export default function ChatPage() {
 
       const data = await response.json();
       const botResponse = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "No response generated.";
-
       return botResponse;
     } catch (error) {
       console.error("Error calling AI API:", error);
@@ -359,7 +381,6 @@ export default function ChatPage() {
 
       const data = await response.json();
       let responseText = data.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
-
       responseText = responseText
         .replace(/```json/g, "")
         .replace(/```/g, "")
@@ -590,7 +611,6 @@ export default function ChatPage() {
         <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
         <div className="flex-1 flex flex-col">
-          {/* Header */}
           <div className="flex items-center justify-between p-3 sm:p-4 border-b border-border bg-card">
             <div className="flex items-center space-x-2 sm:space-x-3">
               <Button
@@ -662,7 +682,6 @@ export default function ChatPage() {
             </div>
           </div>
 
-          {/* Chat Content */}
           <div className="flex-1 overflow-y-auto p-3 sm:p-4 md:p-6">
             <div className="max-w-full sm:max-w-3xl md:max-w-4xl mx-auto space-y-4 sm:space-y-6">
               {!user ? (
@@ -741,7 +760,6 @@ export default function ChatPage() {
             </div>
           </div>
 
-          {/* Input Area */}
           {user && (
             <div className="p-3 sm:p-4 md:p-6 border-t border-border bg-card sticky bottom-0">
               <div className="max-w-full sm:max-w-3xl md:max-w-4xl mx-auto">
@@ -888,8 +906,7 @@ export default function ChatPage() {
                     />
 
                     <p className="text-xs text-muted-foreground">
-                      Supported formats: JPG, PNG, HEIC. This feature analyzes prescription information for educational
-                      purposes only.
+                      Supported formats: JPG, PNG, HEIC. This feature analyzes prescription information for educational purposes only.
                     </p>
                   </div>
                 ) : (

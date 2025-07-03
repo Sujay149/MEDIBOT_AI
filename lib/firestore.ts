@@ -144,7 +144,6 @@ export interface Appointment {
   updatedAt: Timestamp | Date;
 }
 
-// User Profile Functions
 export const createUserProfile = async (
   uid: string,
   email: string,
@@ -223,7 +222,6 @@ export const uploadProfilePicture = async (userId: string, file: File): Promise<
   }
 };
 
-// Chat Functions
 export const createChatSession = async (userId: string, title: string) => {
   try {
     const chatRef = collection(db, "chatSessions");
@@ -278,6 +276,19 @@ export const addMessageToSession = async (
   } catch (error) {
     console.error("Error adding message to session:", error);
     throw new Error("Failed to add message");
+  }
+};
+
+export const updateChatSessionTitle = async (sessionId: string, title: string) => {
+  try {
+    const sessionRef = doc(db, "chatSessions", sessionId);
+    await updateDoc(sessionRef, {
+      title: title.slice(0, 100),
+      updatedAt: serverTimestamp(),
+    });
+  } catch (error) {
+    console.error("Error updating chat session title:", error);
+    throw new Error("Failed to update chat session title");
   }
 };
 
@@ -363,7 +374,6 @@ export const subscribeToUserChatSessions = (
   }
 };
 
-// Prescription Analysis Functions
 export const analyzePrescription = async (
   userId: string,
   fileName: string,
@@ -429,7 +439,6 @@ export const deletePrescriptionAnalysis = async (analysisId: string) => {
   }
 };
 
-// Medication Functions
 export const addMedication = async (
   userId: string,
   medication: Omit<Medication, "id" | "userId" | "createdAt" | "updatedAt">,
@@ -544,7 +553,6 @@ export const scheduleMedicationReminders = async (
   }
 };
 
-// Health Record Functions
 export const addHealthRecord = async (
   userId: string,
   record: Omit<HealthRecord, "id" | "userId" | "createdAt">,
@@ -616,7 +624,6 @@ export const deleteHealthRecord = async (recordId: string) => {
   }
 };
 
-// Summary Request Functions
 export const createSummaryRequest = async (
   userId: string,
   request: Omit<SummaryRequest, "id" | "userId" | "createdAt">,
@@ -672,7 +679,6 @@ export const deleteSummaryRequest = async (summaryId: string) => {
   }
 };
 
-// Notification Settings Functions
 export const createNotificationSettings = async (userId: string) => {
   try {
     const settingsRef = doc(db, "notificationSettings", userId);
@@ -725,7 +731,6 @@ export const updateNotificationSettings = async (userId: string, data: Partial<N
   }
 };
 
-// Appointment Functions
 export const addAppointment = async (
   userId: string,
   appointment: Omit<Appointment, "id" | "userId" | "createdAt" | "updatedAt">,
@@ -800,7 +805,6 @@ export const deleteAppointment = async (appointmentId: string) => {
   }
 };
 
-// Real-time Subscription for Appointments
 export const subscribeToUserAppointments = (
   userId: string,
   callback: (appointments: Appointment[]) => void,
@@ -833,7 +837,6 @@ export const subscribeToUserAppointments = (
   }
 };
 
-// File Upload for Health Records
 export const uploadHealthRecordAttachment = async (userId: string, recordId: string, file: File): Promise<string> => {
   try {
     const storageRef = ref(storage, `healthRecords/${userId}/${recordId}/${file.name}`);
