@@ -55,23 +55,7 @@ export default function ChatPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const searchParams = useSearchParams();
-function ChatContent() {
-  const searchParams = useSearchParams();
-  const sessionId = searchParams?.get("sessionId");
-  const [chatSession, setChatSession] = useState<ChatSession | null>(null);
 
-  useEffect(() => {
-    if (sessionId) {
-      getChatSessionById(sessionId).then(setChatSession).catch(() => setChatSession(null));
-    } else {
-      setChatSession(null);
-    }
-  }, [sessionId]);
-
-  // return <ChatComponent session={chatSession} />;
-  // If you intended to render chat content, implement or import ChatComponent, or render chatSession as needed.
-  return null;
-}
   useEffect(() => {
     if (!user) return;
 
