@@ -1,7 +1,8 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect } from "react"
+
+import { useState } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
@@ -19,19 +20,6 @@ export default function SignInPage() {
   const [loading, setLoading] = useState(false)
   const { signIn, signInWithGoogle, signInWithFacebook } = useAuth()
   const router = useRouter()
-
-  // Clear session storage when tab closes
-  useEffect(() => {
-    const handleBeforeUnload = () => {
-      sessionStorage.clear()
-    }
-
-    window.addEventListener('beforeunload', handleBeforeUnload)
-    
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload)
-    }
-  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
