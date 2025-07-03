@@ -16,6 +16,7 @@ import {
   X,
   ChevronLeft,
   Plus,
+  RefreshCw,
 } from "lucide-react";
 import {
   Dialog,
@@ -50,19 +51,59 @@ export default function HistoryPage() {
       return;
     }
 
-    const unsubscribe = subscribeToUserChatSessions(user.uid, (sessions) => {
-      const sortedSessions = sessions.sort((a, b) => {
-        const aTime = a.updatedAt instanceof Date ? a.updatedAt.getTime() : (a.updatedAt as any)?.seconds * 1000 || 0;
-        const bTime = b.updatedAt instanceof Date ? b.updatedAt.getTime() : (b.updatedAt as any)?.seconds * 1000 || 0;
-        return bTime - aTime;
-      });
-      setChatSessions(sortedSessions);
-      setFilteredSessions(sortedSessions);
-      setLoading(false);
-      setLastUpdated(new Date());
-    });
+    let unsubscribe: () => void;
 
-    return () => unsubscribe();
+    const fetchAndSubscribe = async () => {
+      try {
+        // Initial fetch to ensure data is loaded
+        const initialSessions = await getUserChatSessions(user.uid);
+        console.log("Initial sessions fetched:", initialSessions);
+
+        unsubscribe = subscribeToUserChatSessions(user.uid, (sessions) => {
+          console.log("Real-time sessions received:", sessions); // Debug log
+          if (!Array.isArray(sessions)) {
+            console.error("Sessions is not an array:", sessions);
+            setLoading(false);
+            return;
+          }
+
+          const sortedSessions = sessions
+            .map((session) => {
+              let updatedAtDate: Date;
+              if (session.updatedAt instanceof Date) {
+                updatedAtDate = session.updatedAt;
+              } else if (session.updatedAt && typeof (session.updatedAt as any).toDate === "function") {
+                updatedAtDate = (session.updatedAt as any).toDate();
+              } else if (typeof session.updatedAt === "number") {
+                updatedAtDate = new Date(session.updatedAt);
+              } else if (typeof session.updatedAt === "string") {
+                updatedAtDate = new Date(session.updatedAt);
+              } else {
+                console.warn(`Invalid updatedAt for session ${session.id}:`, session.updatedAt);
+                updatedAtDate = new Date(); // Fallback to current time
+              }
+              return {
+                ...session,
+                updatedAt: updatedAtDate,
+              };
+            })
+            .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
+
+          setChatSessions(sortedSessions);
+          setFilteredSessions(sortedSessions);
+          setLoading(false);
+          setLastUpdated(new Date());
+        });
+      } catch (error) {
+        console.error("Error fetching or subscribing to chat sessions:", error);
+        toast.error("Failed to load chat history");
+        setLoading(false);
+      }
+    };
+
+    fetchAndSubscribe();
+
+    return () => unsubscribe && unsubscribe();
   }, [user]);
 
   useEffect(() => {
@@ -78,7 +119,7 @@ export default function HistoryPage() {
           messages.some(
             (msg) =>
               (msg.message && msg.message.toLowerCase().includes(searchQuery.toLowerCase())) ||
-              (msg.response && msg.response.toLowerCase().includes(searchQuery.toLowerCase()))
+              (msg.response && msg.response?.toLowerCase().includes(searchQuery.toLowerCase()))
           )
         );
       });
@@ -102,6 +143,7 @@ export default function HistoryPage() {
     try {
       await deleteChatSession(sessionToDelete);
       toast.success("Chat session deleted successfully");
+      // Force refresh after deletion
       setChatSessions((prev) => prev.filter((session) => session.id !== sessionToDelete));
       setFilteredSessions((prev) => prev.filter((session) => session.id !== sessionToDelete));
     } catch (error) {
@@ -122,6 +164,42 @@ export default function HistoryPage() {
     setFilteredSessions(chatSessions);
   };
 
+  const handleRefresh = () => {
+    setLoading(true);
+    setChatSessions([]); // Clear state to force reload
+    setFilteredSessions([]);
+    // Re-run the effect to refetch data
+    if (user) {
+      getUserChatSessions(user.uid).then((sessions) => {
+        console.log("Refreshed sessions:", sessions);
+        const sortedSessions = sessions
+          .map((session) => {
+            let updatedAtDate: Date;
+            if (session.updatedAt instanceof Date) {
+              updatedAtDate = session.updatedAt;
+            } else if (session.updatedAt && typeof (session.updatedAt as any).toDate === "function") {
+              updatedAtDate = (session.updatedAt as any).toDate();
+            } else if (typeof session.updatedAt === "number") {
+              updatedAtDate = new Date(session.updatedAt);
+            } else if (typeof session.updatedAt === "string") {
+              updatedAtDate = new Date(session.updatedAt);
+            } else {
+              updatedAtDate = new Date();
+            }
+            return { ...session, updatedAt: updatedAtDate };
+          })
+          .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
+        setChatSessions(sortedSessions);
+        setFilteredSessions(sortedSessions);
+        setLoading(false);
+      }).catch((error) => {
+        console.error("Error refreshing sessions:", error);
+        toast.error("Failed to refresh chat history");
+        setLoading(false);
+      });
+    }
+  };
+
   const formatISTDateTime = (date: Date) => {
     return date.toLocaleString("en-IN", {
       timeZone: "Asia/Kolkata",
@@ -136,14 +214,11 @@ export default function HistoryPage() {
   };
 
   // Calculate totals
-  const totalChats = chatSessions.length;
+  const totalChats = chatSessions.length; // Total number of chat sessions
   const totalMessages = chatSessions.reduce((sum, session) => sum + (session.messages?.length || 0), 0);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const todaysChats = chatSessions.filter((session) => {
-    const sessionTime = session.updatedAt instanceof Date ? session.updatedAt : (session.updatedAt as any)?.toDate?.();
-    return sessionTime && sessionTime >= today;
-  }).length;
+  const todaysChats = chatSessions.filter((session) => session.updatedAt >= today).length;
   const searchResults = filteredSessions.length;
 
   return (
@@ -198,6 +273,15 @@ export default function HistoryPage() {
                   <span>New Chat</span>
                 </Button>
               </Link>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleRefresh}
+                className="text-muted-foreground hover:text-foreground"
+                aria-label="Refresh chat history"
+              >
+                <RefreshCw className="h-5 w-5" />
+              </Button>
             </div>
           </div>
 
@@ -299,11 +383,11 @@ export default function HistoryPage() {
                       <CardContent className="p-4">
                         <div className="flex justify-between items-start">
                           <div className="flex-1 min-w-0">
-                            <h3 className="text-base font-medium text-foreground truncate">{session.title}</h3>
+                            <h3 className="text-base font-medium text-foreground truncate">{session.title || "Untitled"}</h3>
                             <p className="text-sm text-muted-foreground mt-1">
-                              {(session.messages || []).length > 0 ? 
-                                session.messages[0].message : 
-                                "No messages yet"}
+                              {(session.messages || []).length > 0
+                                ? session.messages[0].message || "No message content"
+                                : "No messages yet"}
                             </p>
                             <div className="flex items-center mt-2 text-xs text-muted-foreground">
                               <span>
@@ -312,17 +396,11 @@ export default function HistoryPage() {
                               </span>
                               <span className="mx-2">•</span>
                               <span>
-                                {session.updatedAt instanceof Date
-                                  ? session.updatedAt.toLocaleDateString("en-US", {
-                                      month: "short",
-                                      day: "numeric",
-                                      year: "numeric",
-                                    })
-                                  : (session.updatedAt as any)?.toDate?.()?.toLocaleDateString("en-US", {
-                                      month: "short",
-                                      day: "numeric",
-                                      year: "numeric",
-                                    }) || "Recently"}
+                                {session.updatedAt.toLocaleDateString("en-US", {
+                                  month: "short",
+                                  day: "numeric",
+                                  year: "numeric",
+                                })}
                               </span>
                             </div>
                           </div>
