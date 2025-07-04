@@ -1,4 +1,3 @@
-
 import {
   collection,
   doc,
@@ -140,7 +139,7 @@ export interface Appointment {
   date: string;
   time: string;
   notes?: string;
-  status: "scheduled" | "completed" | "cancelled";
+  status: "scheduled" | "completed" | "cancelled" | "pending" | "approved" | "rejected";
   createdAt: Timestamp | Date;
   updatedAt: Timestamp | Date;
 }
@@ -580,7 +579,6 @@ export function sendMedicationReminder(
   phoneNumber?: string,
   enableWhatsApp?: boolean,
 ) {
-  // Implement your reminder logic using the above parameters
   console.log("Reminder:", userId, medicationName, phoneNumber, enableWhatsApp);
 }
 
@@ -651,6 +649,7 @@ export const updateHealthRecord = async (recordId: string, data: Partial<HealthR
       }
     }
     await updateDoc(docRef, updateData);
+  // removed invalid code: cloud
   } catch (error) {
     console.error("Error updating health record:", error);
     throw new Error("Failed to update health record");
@@ -777,7 +776,7 @@ export const addAppointment = async (
     const appointmentData: Omit<Appointment, "id"> = {
       userId,
       ...appointment,
-      status: appointment.status || "scheduled",
+      status: appointment.status || "pending",
       createdAt: serverTimestamp() as Timestamp,
       updatedAt: serverTimestamp() as Timestamp,
     };
