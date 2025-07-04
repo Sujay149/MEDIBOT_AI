@@ -1,3 +1,4 @@
+
 import {
   collection,
   doc,
@@ -572,13 +573,14 @@ export const addHealthRecord = async (
     throw new Error("Failed to add health record");
   }
 };
+
 export function sendMedicationReminder(
   userId: string,
   medicationName: string,
   phoneNumber?: string,
-  enableWhatsApp?: boolean
+  enableWhatsApp?: boolean,
 ) {
-  // implement your reminder logic using the above parameters
+  // Implement your reminder logic using the above parameters
   console.log("Reminder:", userId, medicationName, phoneNumber, enableWhatsApp);
 }
 
@@ -613,15 +615,6 @@ export const subscribeToUserMedications = (
     return () => {};
   }
 };
-// TODO: Implement getUserSummaries
-export const getUserSummaries = () => {
-  throw new Error("getUserSummaries not implemented");
-};
-// TODO: Implement addSummaryRequest
-export const addSummaryRequest = () => {
-  throw new Error("addSummaryRequest not implemented");
-};
-
 
 export const getUserHealthRecords = async (userId: string): Promise<HealthRecord[]> => {
   try {
@@ -674,29 +667,33 @@ export const deleteHealthRecord = async (recordId: string) => {
   }
 };
 
-export const createSummaryRequest = async (
+export const addSummaryRequest = async (
   userId: string,
-  request: Omit<SummaryRequest, "id" | "userId" | "createdAt">,
+  originalText: string,
+  summary: string,
+  category: "symptoms" | "medication" | "diagnosis" | "treatment" | "general",
 ) => {
   try {
-    const summariesRef = collection(db, "summaryRequests");
+    const summariesRef = collection(db, "summaries");
     const summaryData: Omit<SummaryRequest, "id"> = {
       userId,
-      ...request,
+      originalText,
+      summary,
+      category,
       createdAt: serverTimestamp() as Timestamp,
     };
 
     const docRef = await addDoc(summariesRef, summaryData);
     return docRef.id;
   } catch (error) {
-    console.error("Error creating summary request:", error);
-    throw new Error("Failed to create summary request");
+    console.error("Error adding summary request:", error);
+    throw new Error("Failed to add summary request");
   }
 };
 
-export const getUserSummaryRequests = async (userId: string): Promise<SummaryRequest[]> => {
+export const getUserSummaries = async (userId: string): Promise<SummaryRequest[]> => {
   try {
-    const summariesRef = collection(db, "summaryRequests");
+    const summariesRef = collection(db, "summaries");
     const q = query(summariesRef, where("userId", "==", userId), limit(50));
 
     const querySnapshot = await getDocs(q);
@@ -714,18 +711,8 @@ export const getUserSummaryRequests = async (userId: string): Promise<SummaryReq
       return bTime - aTime;
     });
   } catch (error) {
-    console.error("Error getting summary requests:", error);
+    console.error("Error getting summaries:", error);
     return [];
-  }
-};
-
-export const deleteSummaryRequest = async (summaryId: string) => {
-  try {
-    const summaryRef = doc(db, "summaryRequests", summaryId);
-    await deleteDoc(summaryRef);
-  } catch (error) {
-    console.error("Error deleting summary request:", error);
-    throw new Error("Failed to delete summary request");
   }
 };
 

@@ -6,7 +6,7 @@ import { Sidebar } from "@/components/sidebar";
 import { AuthGuard } from "@/components/auth-guard";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -14,6 +14,7 @@ import { Menu, FileText, Sparkles, Copy, Download, History, Trash2, X } from "lu
 import { useAuth } from "@/hooks/useAuth";
 import { addSummaryRequest, getUserSummaries, type SummaryRequest } from "@/lib/firestore";
 import { toast } from "sonner";
+import { Timestamp } from "firebase/firestore";
 
 export default function SummarizerPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -27,6 +28,13 @@ export default function SummarizerPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const { user } = useAuth();
 
+  // Utility to format Firestore Timestamp or Date
+  const formatDate = (createdAt: Date | Timestamp | undefined): string => {
+    if (!createdAt) return "Recently";
+    const date = createdAt instanceof Timestamp ? createdAt.toDate() : createdAt;
+    return date.toLocaleDateString();
+  };
+
   useEffect(() => {
     if (user) {
       loadSummaries();
@@ -38,7 +46,7 @@ export default function SummarizerPage() {
 
     try {
       setLoadingHistory(true);
-      const userSummaries = await getUserSummaries();
+      const userSummaries = await getUserSummaries(user.uid);
       setSummaries(userSummaries);
     } catch (error) {
       console.error("Error loading summaries:", error);
@@ -63,7 +71,7 @@ export default function SummarizerPage() {
       setSummary(generatedSummary);
 
       // Save to Firestore
-      await addSummaryRequest();
+      await addSummaryRequest(user.uid, inputText, generatedSummary, category);
 
       toast.success("Summary generated successfully!");
 
@@ -72,7 +80,7 @@ export default function SummarizerPage() {
     } catch (error) {
       console.error("Error generating summary:", error);
       toast.error("Failed to generate summary");
-      setInputText(originalInput); // Restore input on error
+      setInputText(originalInput);
     } finally {
       setLoading(false);
     }
@@ -97,15 +105,15 @@ export default function SummarizerPage() {
               {
                 parts: [
                   {
-                    text: prompt
-                  }
-                ]
-              }
+                    text: prompt,
+                  },
+                ],
+              },
             ],
             generationConfig: {
               temperature: 0.7,
               maxOutputTokens: 300,
-            }
+            },
           }),
         }
       );
@@ -200,11 +208,10 @@ export default function SummarizerPage() {
                 {/* Input Section */}
                 <Card className="bg-card border-border rounded-xl shadow">
                   <CardHeader>
-                   <CardTitle className="flex items-center space-x-2 text-lg text-white">
-  <FileText className="h-5 w-5 text-muted-foreground" />
-  <span>Input Medical Information</span>
-</CardTitle>
-
+                    <CardTitle className="flex items-center space-x-2 text-lg text-white">
+                      <FileText className="h-5 w-5 text-muted-foreground" />
+                      <span>Input Medical Information</span>
+                    </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div>
@@ -270,9 +277,9 @@ export default function SummarizerPage() {
                   <CardHeader>
                     <CardTitle className="flex items-center justify-between text-lg">
                       <div className="flex items-center space-x-2 text-white">
-  <Sparkles className="h-5 w-5" />
-  <span>AI Summary</span>
-</div>
+                        <Sparkles className="h-5 w-5" />
+                        <span>AI Summary</span>
+                      </div>
                       {summary && (
                         <div className="flex space-x-2">
                           <Button
@@ -334,15 +341,19 @@ export default function SummarizerPage() {
                   ) : summaries.length > 0 ? (
                     <div className="space-y-4">
                       {summaries.slice(0, 5).map((summary, index) => (
-                        <Dialog key={summary.id || index} open={dialogOpen && selectedSummaryId === (summary.id || index.toString())} onOpenChange={(open) => {
-                          if (open) {
-                            setSelectedSummaryId(summary.id || index.toString());
-                            setDialogOpen(true);
-                          } else {
-                            setSelectedSummaryId(null);
-                            setDialogOpen(false);
-                          }
-                        }}>
+                        <Dialog
+                          key={summary.id || index}
+                          open={dialogOpen && selectedSummaryId === (summary.id || index.toString())}
+                          onOpenChange={(open) => {
+                            if (open) {
+                              setSelectedSummaryId(summary.id || index.toString());
+                              setDialogOpen(true);
+                            } else {
+                              setSelectedSummaryId(null);
+                              setDialogOpen(false);
+                            }
+                          }}
+                        >
                           <DialogTrigger asChild>
                             <div
                               className="bg-muted rounded-lg p-4 border border-border cursor-pointer hover:bg-purple-600/10 transition-colors"
@@ -355,20 +366,14 @@ export default function SummarizerPage() {
                                 <Badge className="bg-purple-600 text-white">
                                   {summary.category.charAt(0).toUpperCase() + summary.category.slice(1)}
                                 </Badge>
-                                <span className="text-muted-foreground text-xs">
-                                  {(
-                                    summary.createdAt
-                                      ? (typeof summary.createdAt === "object" && "toDate" in summary.createdAt
-                                          ? (summary.createdAt as any).toDate().toLocaleDateString()
-                                          : (summary.createdAt as Date).toLocaleDateString())
-                                      : "Recently"
-                                  )}
-                                </span>
+                                <span className="text-muted-foreground text-xs">{formatDate(summary.createdAt)}</span>
                               </div>
                               <p className="text-foreground text-sm line-clamp-2 mb-2">
                                 {summary.originalText.slice(0, 150)}...
                               </p>
-                              <p className="text-muted-foreground text-xs">Summary: {summary.summary.slice(0, 100)}...</p>
+                              <p className="text-muted-foreground text-xs">
+                                Summary: {summary.summary.slice(0, 100)}...
+                              </p>
                             </div>
                           </DialogTrigger>
                           <DialogContent className="bg-card border-border text-foreground max-w-[90vw] sm:max-w-2xl max-h-[80vh] overflow-y-auto rounded-xl p-4 sm:p-6 shadow">
@@ -397,15 +402,7 @@ export default function SummarizerPage() {
                                 <Badge className="bg-purple-600 text-white">
                                   {summary.category.charAt(0).toUpperCase() + summary.category.slice(1)}
                                 </Badge>
-                                <span className="text-muted-foreground text-xs">
-                                  {(
-                                    summary.createdAt
-                                      ? (typeof summary.createdAt === "object" && "toDate" in summary.createdAt
-                                          ? (summary.createdAt as any).toDate().toLocaleDateString()
-                                          : (summary.createdAt as Date).toLocaleDateString())
-                                      : "Recently"
-                                  )}
-                                </span>
+                                <span className="text-muted-foreground text-xs">{formatDate(summary.createdAt)}</span>
                               </div>
                               <div>
                                 <h4 className="font-semibold text-sm mb-2">Original Text</h4>
