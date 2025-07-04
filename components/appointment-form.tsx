@@ -1,3 +1,4 @@
+
 "use client";
 
 import type React from "react";
@@ -61,6 +62,7 @@ export function AppointmentForm({ appointment, onSuccess, onCancel }: Appointmen
   }, [appointment]);
 
   useEffect(() => {
+    // Load Google Maps script
     if (!window.google) {
       const script = document.createElement("script");
       script.src = `https://maps.googleapis.com/maps/api/js?key=AIzaSyBFIj4bvoggVuZftrZ-_Fjg3tF-HpV2gsM&libraries=places`;
@@ -82,21 +84,22 @@ export function AppointmentForm({ appointment, onSuccess, onCancel }: Appointmen
   const initializeMap = () => {
     if (mapRef.current && window.google) {
       const defaultLocation = { lat: 40.7128, lng: -74.006 }; // New York City default
+
       mapInstanceRef.current = new window.google.maps.Map(mapRef.current, {
         zoom: 13,
         center: hospitalLocation || defaultLocation,
         styles: [
           {
             elementType: "geometry",
-            stylers: [{ color: "#18181b" }],
+            stylers: [{ color: "#18181b" }], // zinc-900
           },
           {
             elementType: "labels.text.stroke",
-            stylers: [{ color: "#18181b" }],
+            stylers: [{ color: "#18181b" }], // zinc-900
           },
           {
             elementType: "labels.text.fill",
-            stylers: [{ color: "#a855f7" }],
+            stylers: [{ color: "#a855f7" }], // purple-600
           },
         ],
       });
@@ -109,10 +112,13 @@ export function AppointmentForm({ appointment, onSuccess, onCancel }: Appointmen
 
   const updateMapLocation = (location: HospitalLocation) => {
     if (!mapInstanceRef.current) return;
+
     mapInstanceRef.current.setCenter(location);
+
     if (markerRef.current) {
       markerRef.current.setMap(null);
     }
+
     markerRef.current = new window.google.maps.Marker({
       position: location,
       map: mapInstanceRef.current,
@@ -121,10 +127,10 @@ export function AppointmentForm({ appointment, onSuccess, onCancel }: Appointmen
         url:
           "data:image/svg+xml;charset=UTF-8," +
           encodeURIComponent(`
-            <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M16 2C10.48 2 6 6.48 6 12C6 20 16 30 16 30S26 20 26 12C26 6.48 21.52 2 16 2ZM16 16C13.79 16 12 14.21 12 12S13.79 8 16 8S20 9.79 20 12S18.21 16 16 16Z" fill="#a855f7"/>
-            </svg>
-          `),
+          <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M16 2C10.48 2 6 6.48 6 12C6 20 16 30 16 30S26 20 26 12C26 6.48 21.52 2 16 2ZM16 16C13.79 16 12 14.21 12 12S13.79 8 16 8S20 9.79 20 12S18.21 16 16 16Z" fill="#a855f7"/>
+          </svg>
+        `),
         scaledSize: new window.google.maps.Size(32, 32),
       },
     });
@@ -137,10 +143,12 @@ export function AppointmentForm({ appointment, onSuccess, onCancel }: Appointmen
     }
 
     setSearchingLocation(true);
+
     try {
       if (window.google && window.google.maps) {
         const geocoder = new window.google.maps.Geocoder();
         const query = `${formData.hospitalName} ${formData.hospitalAddress || "hospital"}`;
+
         geocoder.geocode({ address: query }, (results, status) => {
           if (status === "OK" && results && results[0]) {
             const location = results[0].geometry.location;
@@ -149,12 +157,15 @@ export function AppointmentForm({ appointment, onSuccess, onCancel }: Appointmen
               lng: location.lng(),
             };
             setHospitalLocation(newLocation);
+
+            // Update address if not provided
             if (!formData.hospitalAddress && results[0].formatted_address) {
               setFormData((prev) => ({
                 ...prev,
                 hospitalAddress: results[0].formatted_address,
               }));
             }
+
             toast.success("Hospital location found!");
           } else {
             toast.error("Could not find hospital location. Please check the name and try again.");
@@ -171,11 +182,9 @@ export function AppointmentForm({ appointment, onSuccess, onCancel }: Appointmen
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) {
-      toast.error("Please sign in to book an appointment");
-      return;
-    }
+    if (!user) return;
 
+    // Validate required fields
     if (!formData.hospitalName.trim()) {
       toast.error("Hospital name is required");
       return;
@@ -202,8 +211,9 @@ export function AppointmentForm({ appointment, onSuccess, onCancel }: Appointmen
     }
 
     setLoading(true);
+
     try {
-      const appointmentData: Omit<Appointment, "id" | "userId" | "createdAt" | "updatedAt"> = {
+      const appointmentData = {
         hospitalName: formData.hospitalName.trim(),
         hospitalAddress: formData.hospitalAddress.trim(),
         hospitalPhone: formData.hospitalPhone.trim(),
@@ -212,25 +222,18 @@ export function AppointmentForm({ appointment, onSuccess, onCancel }: Appointmen
         date: formData.date,
         time: formData.time,
         notes: formData.notes.trim(),
-        status: "pending", // Default to pending for new appointments
+        hospitalLocation,
       };
-
-      if (hospitalLocation) {
-        appointmentData.hospitalLocation = {
-          lat: hospitalLocation.lat,
-          lng: hospitalLocation.lng,
-        };
-      }
 
       console.log("Submitting appointment data:", appointmentData);
       console.log("User ID:", user.uid);
 
       if (appointment && appointment.id) {
-        await updateAppointment(appointment.id, appointmentData);
+        await updateAppointment(appointment.id, { ...appointmentData, hospitalLocation: hospitalLocation ?? undefined });
         toast.success("Appointment updated successfully!");
       } else {
-        await addAppointment(user.uid, appointmentData);
-        toast.success("Appointment booked successfully! You'll receive an email once it's reviewed.");
+        await addAppointment(user.uid, { ...appointmentData, hospitalLocation: hospitalLocation ?? undefined, status: "scheduled" });
+        toast.success("Appointment booked successfully!");
       }
 
       onSuccess();
@@ -244,8 +247,10 @@ export function AppointmentForm({ appointment, onSuccess, onCancel }: Appointmen
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
+      {/* Hospital Information */}
       <div className="space-y-4">
         <h3 className="text-lg font-semibold text-foreground">Hospital Information</h3>
+
         <div>
           <Label htmlFor="hospitalName" className="text-muted-foreground">Hospital Name *</Label>
           <div className="flex space-x-2 mt-1">
@@ -273,6 +278,7 @@ export function AppointmentForm({ appointment, onSuccess, onCancel }: Appointmen
             </Button>
           </div>
         </div>
+
         <div>
           <Label htmlFor="hospitalAddress" className="text-muted-foreground">Hospital Address *</Label>
           <Input
@@ -284,6 +290,7 @@ export function AppointmentForm({ appointment, onSuccess, onCancel }: Appointmen
             required
           />
         </div>
+
         <div>
           <Label htmlFor="hospitalPhone" className="text-muted-foreground">Hospital Phone</Label>
           <Input
@@ -294,6 +301,8 @@ export function AppointmentForm({ appointment, onSuccess, onCancel }: Appointmen
             className="bg-muted border-border text-foreground focus:outline-none focus:ring-2 focus:ring-purple-600 mt-1 rounded-lg"
           />
         </div>
+
+        {/* Map */}
         <div>
           <Label className="text-muted-foreground">Hospital Location</Label>
           <div className="mt-1 h-48 bg-muted border border-border rounded-lg overflow-hidden">
@@ -307,8 +316,11 @@ export function AppointmentForm({ appointment, onSuccess, onCancel }: Appointmen
           )}
         </div>
       </div>
+
+      {/* Appointment Details */}
       <div className="space-y-4">
         <h3 className="text-lg font-semibold text-foreground">Appointment Details</h3>
+
         <div>
           <Label htmlFor="doctorName" className="text-muted-foreground">Doctor Name *</Label>
           <Input
@@ -320,6 +332,7 @@ export function AppointmentForm({ appointment, onSuccess, onCancel }: Appointmen
             required
           />
         </div>
+
         <div>
           <Label htmlFor="appointmentType" className="text-muted-foreground">Appointment Type *</Label>
           <Select
@@ -336,12 +349,12 @@ export function AppointmentForm({ appointment, onSuccess, onCancel }: Appointmen
               <SelectItem value="specialist">Specialist Consultation</SelectItem>
               <SelectItem value="emergency">Emergency Visit</SelectItem>
               <SelectItem value="diagnostic">Diagnostic Tests</SelectItem>
-             
               <SelectItem value="surgery">Surgery Consultation</SelectItem>
               <SelectItem value="therapy">Therapy Session</SelectItem>
             </SelectContent>
           </Select>
         </div>
+
         <div className="grid grid-cols-2 gap-4">
           <div>
             <Label htmlFor="date" className="text-muted-foreground">Date *</Label>
@@ -367,6 +380,7 @@ export function AppointmentForm({ appointment, onSuccess, onCancel }: Appointmen
             />
           </div>
         </div>
+
         <div>
           <Label htmlFor="notes" className="text-muted-foreground">Notes (Optional)</Label>
           <Textarea
@@ -378,6 +392,8 @@ export function AppointmentForm({ appointment, onSuccess, onCancel }: Appointmen
           />
         </div>
       </div>
+
+      {/* Form Actions */}
       <div className="flex space-x-3 pt-4">
         <Button
           type="button"
