@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
@@ -16,8 +15,9 @@ import { doc, onSnapshot } from "firebase/firestore";
 import { auth, db, googleProvider, facebookProvider } from "@/lib/firebase";
 import { getUserProfile, type UserProfile } from "@/lib/firestore";
 
-// Utility to get/set cached profile in localStorage
+// Constants for caching
 const PROFILE_CACHE_KEY = "medibot_user_profile";
+
 const getCachedProfile = (uid: string): UserProfile | null => {
   try {
     const cached = localStorage.getItem(`${PROFILE_CACHE_KEY}_${uid}`);
@@ -27,6 +27,7 @@ const getCachedProfile = (uid: string): UserProfile | null => {
     return null;
   }
 };
+
 const setCachedProfile = (uid: string, profile: UserProfile | null) => {
   try {
     if (profile) {
@@ -44,12 +45,9 @@ export function useAuth() {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Manual re-fetch function with debouncing
   const refreshProfile = useCallback(async (uid: string) => {
-    console.log("useAuth: Manually refreshing profile for user", uid);
     try {
       const profile = await getUserProfile(uid);
-      console.log("useAuth: Refreshed profile", { photoURL: profile?.photoURL });
       setUserProfile(profile);
       setCachedProfile(uid, profile);
     } catch (error) {
@@ -57,94 +55,92 @@ export function useAuth() {
     }
   }, []);
 
+  // Auth state listener
   useEffect(() => {
-    console.log("useAuth: Setting up auth listener");
-    const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser) => {
-      console.log("useAuth: Auth state changed", { uid: firebaseUser?.uid, email: firebaseUser?.email });
+    const unsubscribeAuth = onAuthStateChanged(auth, (firebaseUser) => {
       setUser(firebaseUser);
+      setLoading(false); // Done with auth check
 
       if (firebaseUser) {
-        // Load cached profile for faster initial render
-        const cachedProfile = getCachedProfile(firebaseUser.uid);
-        if (cachedProfile) {
-          console.log("useAuth: Using cached profile", { photoURL: cachedProfile.photoURL });
-          setUserProfile(cachedProfile);
+        const cached = getCachedProfile(firebaseUser.uid);
+        if (cached && !userProfile) {
+          setUserProfile(cached);
         }
-
-        // Set loading to false immediately after auth state resolves
-        setLoading(false);
-
-        // Fetch profile from Firestore (async, non-blocking)
-        try {
-          const profile = await getUserProfile(firebaseUser.uid);
-          console.log("useAuth: Initial profile fetched", { photoURL: profile?.photoURL });
-          setUserProfile(profile);
-          setCachedProfile(firebaseUser.uid, profile);
-        } catch (error) {
-          console.error("useAuth: Error fetching initial profile:", error);
-          setUserProfile(null);
-          setCachedProfile(firebaseUser.uid, null);
-        }
-
-        // Subscribe to real-time Firestore updates
-        const userRef = doc(db, "users", firebaseUser.uid);
-        const unsubscribeFirestore = onSnapshot(
-          userRef,
-          (docSnap) => {
-            if (docSnap.exists()) {
-              const data = docSnap.data() as UserProfile;
-              console.log("useAuth: Firestore snapshot updated", {
-                photoURL: data.photoURL,
-                displayName: data.displayName,
-                updatedAt: data.updatedAt?.toString(),
-              });
-              const normalizedProfile = {
-                ...data,
-                gender: data.gender ?? "",
-                medicalInfo: data.medicalInfo
-                  ? { ...data.medicalInfo, bloodType: data.medicalInfo.bloodType ?? "" }
-                  : { allergies: [], conditions: [], bloodType: "" },
-              };
-              setUserProfile(normalizedProfile);
-              setCachedProfile(firebaseUser.uid, normalizedProfile);
-            } else {
-              console.log("useAuth: Firestore document does not exist for user", firebaseUser.uid);
-              setUserProfile(null);
-              setCachedProfile(firebaseUser.uid, null);
-            }
-          },
-          (error) => {
-            console.error("useAuth: Error in Firestore snapshot:", error);
-            // Fallback: Retry refresh with exponential backoff
-            setTimeout(() => refreshProfile(firebaseUser.uid), 1000);
-          }
-        );
-
-        // Cleanup Firestore subscription
-        return () => {
-          console.log("useAuth: Cleaning up Firestore subscription for user", firebaseUser.uid);
-          unsubscribeFirestore();
-        };
       } else {
-        console.log("useAuth: No authenticated user");
-        setUserProfile(null);
+        if (userProfile !== null) {
+          setUserProfile(null);
+        }
         setCachedProfile("", null);
-        setLoading(false);
       }
     });
 
-    // Cleanup Auth subscription
-    return () => {
-      console.log("useAuth: Cleaning up auth subscription");
-      unsubscribeAuth();
-    };
-  }, [refreshProfile]);
+    return () => unsubscribeAuth();
+  }, [userProfile]);
 
+  // Firestore real-time profile sync
+  useEffect(() => {
+    if (!user) return;
+
+    let unsubscribeFirestore: () => void;
+
+    const fetchAndSubscribe = async () => {
+      try {
+        const profile = await getUserProfile(user.uid);
+        if (
+          !userProfile ||
+          JSON.stringify(profile) !== JSON.stringify(userProfile)
+        ) {
+          setUserProfile(profile);
+          setCachedProfile(user.uid, profile);
+        }
+      } catch (err) {
+        console.error("useAuth: Error fetching profile:", err);
+      }
+
+      const userRef = doc(db, "users", user.uid);
+      unsubscribeFirestore = onSnapshot(
+        userRef,
+        (docSnap) => {
+          if (docSnap.exists()) {
+            const data = docSnap.data() as UserProfile;
+            const normalizedProfile: UserProfile = {
+              ...data,
+              gender: data.gender ?? "",
+              medicalInfo: data.medicalInfo
+                ? {
+                    ...data.medicalInfo,
+                    bloodType: data.medicalInfo.bloodType ?? "",
+                  }
+                : { allergies: [], conditions: [], bloodType: "" },
+            };
+            setUserProfile(normalizedProfile);
+            setCachedProfile(user.uid, normalizedProfile);
+          }
+        },
+        (error) => {
+          console.error("useAuth: Firestore snapshot error:", error);
+          setTimeout(() => refreshProfile(user.uid), 1000); // Retry after delay
+        }
+      );
+    };
+
+    fetchAndSubscribe();
+
+    return () => {
+      if (unsubscribeFirestore) unsubscribeFirestore();
+    };
+  }, [user, refreshProfile]);
+
+  // Auth functions
   const signIn = async (email: string, password: string) => {
     return signInWithEmailAndPassword(auth, email, password);
   };
 
-  const signUp = async (email: string, password: string, displayName?: string) => {
+  const signUp = async (
+    email: string,
+    password: string,
+    displayName?: string
+  ) => {
     const result = await createUserWithEmailAndPassword(auth, email, password);
     if (displayName && result.user) {
       await updateProfile(result.user, { displayName });
@@ -162,7 +158,7 @@ export function useAuth() {
 
   const logout = async () => {
     await signOut(auth);
-    console.log("useAuth: User signed out");
+    setUserProfile(null);
     setCachedProfile("", null);
   };
 

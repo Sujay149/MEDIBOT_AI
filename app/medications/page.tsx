@@ -539,8 +539,8 @@ export default function MedicationsPage() {
           <div className="flex-1 p-4 sm:p-6 overflow-y-auto">
             <div className="max-w-4xl mx-auto">
               <div className="mb-6 sm:mb-8">
-                <h1 className="text-2xl sm:text-3xl font-semibold">You may forget, but Medibot never forgets...</h1>
-                <p className="text-muted-foreground text-sm">Manage your prescriptions and set reminders</p>
+                <h1 className="text-2xl sm:text-3xl font-semibold">Stay on Track with Your Meds</h1>
+                <p className="text-muted-foreground text-sm">Manage your Medications and set reminders</p>
               </div>
 
               {loading ? (
