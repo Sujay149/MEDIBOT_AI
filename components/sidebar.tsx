@@ -196,7 +196,8 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
                   <div className="flex items-center space-x-3">
                     <Avatar className="w-12 h-12" key={userProfile?.photoURL || "default"}>
                       <AvatarImage
-                        src={userProfile?.photoURL ? `${userProfile.photoURL}?t=${Date.now()}` : user?.photoURL || ""}
+                        src={userProfile?.photoURL || user?.photoURL || ""}
+
                       />
                       <AvatarFallback className="bg-purple-600 text-white font-semibold">
                         {userProfile?.displayName?.charAt(0).toUpperCase() ||
