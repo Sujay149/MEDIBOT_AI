@@ -58,7 +58,7 @@ export interface ChatMessage {
 }
 
 export interface ChatSession {
-  id?: string;
+   id?: string | null;
   userId: string;
   title: string;
   messages: ChatMessage[];
