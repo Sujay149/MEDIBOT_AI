@@ -41,7 +41,11 @@ import {
   Pill,
   AlertCircle,
 } from "lucide-react";
-
+declare global {
+  interface Window {
+    puter: any; // Or a more specific type if known
+  }
+}
 interface PrescriptionAnalysis {
   medications: string[];
   dosages: string[];
@@ -191,7 +195,7 @@ function ChatContent() {
 
       let botResponse = "";
       if (message.trim()) {
-        botResponse = await generateAIResponse(message);
+        botResponse = await generateAIResponse(message, selectedModel);
       }
       if (selectedFile) {
         const analysis = await analyzePrescription(selectedFile);
@@ -241,7 +245,7 @@ function ChatContent() {
 
       try {
         setLoading(true);
-        const botResponse = await generateAIResponse(editedMessage);
+        const botResponse = await generateAIResponse(editedMessage, selectedModel);
         const sessionId = currentSession?.id;
         if (sessionId) {
           const updatedMessages = (currentSession?.messages ?? []).map((msg, index) =>
@@ -321,29 +325,37 @@ function ChatContent() {
     }
   };
 
-  const generateAIResponse = async (userMessage: string): Promise<string> => {
-    try {
-      const endpoint = selectedModel === "grok"
-        ? "https://api.x.ai/v1/models/grok:generateContent"
-        : `https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:generateContent`;
+ // Add this at the top if it's not already declared
+
+
+const generateAIResponse = async (userMessage: string, selectedModel: string): Promise<string> => {
+  try {
+    const modelMap: Record<string, string> = {
+      "gemini-1.5-flash-latest": "gemini-1.5-flash",
+      "gemini-1.5-pro-latest": "gpt-4o",
+      "grok": "x-ai/grok-3-beta"
+    };
+
+    const resolvedModel = modelMap[selectedModel];
+
+    if (!resolvedModel) {
+      console.error("Unrecognized model:", selectedModel);
+      return "Model not recognized. Please select a valid model.";
+    }
+
+    const prompt = `You are Medibot, a health-focused AI assistant. Provide a concise, informative, and professional response to the following health-related user query. Ensure the response is educational, not a substitute for professional medical advice, and includes a reminder to consult a healthcare professional for personalized advice. Query: ${userMessage}`;
+
+    // ✅ Gemini
+    if (resolvedModel === "gemini-1.5-flash") {
+      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${resolvedModel}:generateContent`;
 
       const response = await fetch(
         `${endpoint}?key=${process.env.NEXT_PUBLIC_GEMINI_API_KEY}`,
         {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            contents: [
-              {
-                parts: [
-                  {
-                    text: `You are Medibot, a health-focused AI assistant. Provide a concise, informative, and professional response to the following health-related user query. Ensure the response is educational, not a substitute for professional medical advice, and includes a reminder to consult a healthcare professional for personalized advice. Query: ${userMessage}`,
-                  },
-                ],
-              },
-            ],
+            contents: [{ parts: [{ text: prompt }] }],
             generationConfig: {
               temperature: 0.7,
               maxOutputTokens: 200,
@@ -357,13 +369,31 @@ function ChatContent() {
       }
 
       const data = await response.json();
-      const botResponse = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "No response generated.";
-      return botResponse;
-    } catch (error) {
-      console.error("Error calling AI API:", error);
-      return "I'm sorry, I couldn't process your request at this time. Please try again later or consult a healthcare professional for personalized advice";
+      return data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "No response generated.";
     }
-  };
+
+    // ✅ Puter.js (OpenAI & Grok)
+    if (typeof window !== "undefined" && !window.puter) {
+      await new Promise<void>((resolve, reject) => {
+        const script = document.createElement("script");
+        script.src = "https://js.puter.com/v2/";
+        script.onload = () => resolve();
+        script.onerror = () => reject("Failed to load Puter.js");
+        document.head.appendChild(script);
+      });
+    }
+
+    const response = await window.puter.ai.chat(prompt, {
+      model: resolvedModel,
+    });
+
+    return response?.message?.content?.trim() || "No response generated.";
+  } catch (error) {
+    console.error("Error generating response:", error);
+    return "I'm sorry, I couldn't process your request right now.";
+  }
+};
+
 
   const analyzePrescription = async (file: File): Promise<PrescriptionAnalysis> => {
     try {
@@ -823,8 +853,8 @@ function ChatContent() {
                           </SelectTrigger>
                           <SelectContent className="bg-card border-border text-foreground text-xs shadow-lg">
                             <SelectItem value="gemini-1.5-flash-latest">Gemini 1.5 Flash</SelectItem>
-                            <SelectItem value="gemini-1.5-pro-latest">Gemini 1.5 Pro</SelectItem>
-                            <SelectItem value="grok">Grok (Beta)</SelectItem>
+                            <SelectItem value="gemini-1.5-pro-latest">gpt-4o</SelectItem>
+                            <SelectItem value="grok">x-ai/grok-3-beta</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
