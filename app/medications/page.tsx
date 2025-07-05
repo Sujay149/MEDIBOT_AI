@@ -14,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { Menu, Plus, Pill, Clock, Trash2, Edit, Bell } from "lucide-react";
+import { Menu, Plus, Pill, Clock, Trash2, Edit, Bell, Phone } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import {
   addMedication,
@@ -311,7 +311,7 @@ export default function MedicationsPage() {
         toast.error("User not authenticated");
         return;
       }
-      const message = `🧪 This is a test reminder for your medication ${medication.name} (${medication.dosage}). Your reminders are working! 💊`;
+      const message = `🧪 This is a test reminder for your medication ${medication.name} (${medication.dosage}). 💊`;
       const notifications = [
         sendMobileNotification(user.uid, "Test Reminder", message),
         user.email ? sendEmailNotification(user.email, "Test Reminder", message) : Promise.resolve(),
@@ -549,102 +549,107 @@ export default function MedicationsPage() {
                   <p className="text-muted-foreground text-sm">Loading medications...</p>
                 </div>
               ) : medications.length > 0 ? (
-                <div className="grid gap-4 sm:gap-6">
-                  {medications.map((medication) => (
-                    <Card key={medication.id} className="bg-card border-border rounded-xl shadow">
-                      <CardHeader className="pb-3">
-                        <div className="flex items-start justify-between">
-                          <div>
-                            <CardTitle className="text-lg sm:text-xl flex items-center gap-2 text-foreground">
-                              {medication.name}
-                              {medication.enableWhatsApp && (
-                                <Badge variant="secondary" className="bg-green-600 text-white">
-                                  WhatsApp
-                                </Badge>
-                              )}
-                            </CardTitle>
-                            <p className="text-muted-foreground text-sm sm:text-base">
-                              {medication.dosage} • {medication.frequency}
-                            </p>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            {medication.reminderTimes.length > 0 && (
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => testReminder(medication)}
-                                className="text-muted-foreground hover:text-green-500 hover:bg-muted h-8 w-8"
-                                title="Test Reminder"
-                                aria-label="Test Reminder"
-                              >
-                                <Bell className="h-4 w-4" />
-                              </Button>
-                            )}
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleEditMedication(medication)}
-                              className="text-muted-foreground hover:text-foreground hover:bg-muted h-8 w-8"
-                              title="Edit Medication"
-                              aria-label="Edit Medication"
-                            >
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => medication.id && handleDeleteMedication(medication.id)}
-                              className="text-muted-foreground hover:text-red-500 hover:bg-muted h-8 w-8"
-                              title="Delete Medication"
-                              aria-label="Delete Medication"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </div>
-                      </CardHeader>
-                      <CardContent className="pt-0">
-                        <div className="space-y-3">
-                          <div className="flex flex-wrap gap-2">
-                            <Badge variant="secondary" className="bg-muted text-muted-foreground">
-                              <Clock className="mr-1 h-3 w-3" />
-                              {medication.startDate}
-                            </Badge>
-                            {medication.endDate && (
-                              <Badge variant="secondary" className="bg-muted text-muted-foreground">
-                                Until {medication.endDate}
-                              </Badge>
-                            )}
-                            {medication.phoneNumber && (
-                              <Badge variant="secondary" className="bg-muted text-muted-foreground">
-                                Phone: {medication.phoneNumber}
-                              </Badge>
-                            )}
-                          </div>
+               <div className="grid gap-6 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-2">
+  {medications.map((medication) => (
+    <div
+      key={medication.id}
+      className="rounded-2xl border border-border bg-muted/30 backdrop-blur-md p-5 shadow-md hover:shadow-xl hover:scale-[1.01] transition-all duration-300"
+    >
+      <div className="flex justify-between items-start mb-4">
+        <div>
+          <h2 className="text-xl font-semibold flex items-center gap-2">
+            {medication.name}
+            {medication.enableWhatsApp && (
+              <Badge
+                title="WhatsApp Reminders Enabled"
+                className="bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded-full"
+              >
+                WhatsApp
+              </Badge>
+            )}
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            {medication.dosage} • {medication.frequency}
+          </p>
+        </div>
+        <div className="flex items-center gap-2 text-muted-foreground">
+          {medication.reminderTimes.length > 0 && (
+            <Button
+              size="icon"
+              variant="ghost"
+              onClick={() => testReminder(medication)}
+              className="hover:text-green-600"
+              title="Test Reminder"
+            >
+              <Bell className="w-4 h-4" />
+            </Button>
+          )}
+          <Button
+            size="icon"
+            variant="ghost"
+            onClick={() => handleEditMedication(medication)}
+            className="hover:text-purple-600"
+            title="Edit"
+          >
+            <Edit className="w-4 h-4" />
+          </Button>
+          <Button
+            size="icon"
+            variant="ghost"
+            onClick={() => medication.id && handleDeleteMedication(medication.id)}
+            className="hover:text-red-600"
+            title="Delete"
+          >
+            <Trash2 className="w-4 h-4" />
+          </Button>
+        </div>
+      </div>
 
-                          {medication.reminderTimes.length > 0 && (
-                            <div>
-                              <p className="text-muted-foreground text-sm mb-2">Reminder times:</p>
-                              <div className="flex flex-wrap gap-2">
-                                {medication.reminderTimes.map((time, index) => (
-                                  <Badge key={index} className="bg-purple-600 text-white">
-                                    {time}
-                                  </Badge>
-                                ))}
-                              </div>
-                            </div>
-                          )}
+      <div className="flex flex-wrap gap-3 text-sm text-muted-foreground mb-3">
+        <Badge className="bg-muted text-muted-foreground rounded-full px-3 py-1 flex items-center gap-1">
+          <Clock className="w-3 h-3" /> {medication.startDate}
+        </Badge>
+        {medication.endDate && (
+          <Badge className="bg-muted text-muted-foreground rounded-full px-3 py-1 flex items-center gap-1">
+            <Clock className="w-3 h-3" /> Until {medication.endDate}
+          </Badge>
+        )}
+        {medication.phoneNumber && (
+          <Badge className="bg-muted text-muted-foreground rounded-full px-3 py-1 flex items-center gap-1">
+            <Phone className="w-3 h-3" /> {medication.phoneNumber}
+          </Badge>
+        )}
+      </div>
 
-                          {medication.notes && (
-                            <p className="text-foreground text-sm bg-muted p-3 rounded-lg">{medication.notes}</p>
-                          )}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
+      {medication.reminderTimes.length > 0 && (
+        <div className="mb-3">
+          <p className="text-sm text-muted-foreground mb-1">Reminder times:</p>
+          <div className="flex flex-wrap gap-2">
+            {medication.reminderTimes.map((time, index) => (
+              <Badge
+                key={index}
+                className="bg-purple-600 text-white rounded-full px-3 py-1 text-xs font-medium flex items-center gap-1"
+              >
+                <Clock className="w-3 h-3" />
+                {time}
+              </Badge>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {medication.notes && (
+        <div className="bg-muted px-4 py-3 rounded-lg text-sm text-foreground border border-border">
+          {medication.notes}
+        </div>
+      )}
+    </div>
+  ))}
+</div>
+
               ) : (
-                <div className="bg-card border-border rounded-2xl p-8 sm:p-12 text-center shadow">
+                <div className="bg-muted/20 border border-dashed border-border rounded-2xl p-8 sm:p-12 text-center shadow-lg backdrop-blur-md">
+
                   <div className="w-16 h-16 sm:w-20 sm:h-20 bg-muted rounded-full flex items-center justify-center mx-auto mb-6 sm:mb-8">
                     <Pill className="h-8 w-8 sm:h-10 sm:w-10 text-muted-foreground" />
                   </div>
