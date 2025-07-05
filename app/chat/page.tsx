@@ -40,8 +40,6 @@ import {
   FileText,
   Pill,
   AlertCircle,
-  Volume2,
-  VolumeX,
 } from "lucide-react";
 
 interface PrescriptionAnalysis {
@@ -77,8 +75,6 @@ function ChatContent() {
   const [selectedModel, setSelectedModel] = useState("gemini-1.5-flash-latest");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [fileName, setFileName] = useState<string>("");
-  const [isSpeaking, setIsSpeaking] = useState(false);
-  const speechSynthesisRef = useRef<SpeechSynthesisUtterance | null>(null);
   const { user, userProfile } = useAuth();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -130,30 +126,6 @@ function ChatContent() {
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
-
-  const speakText = (text: string) => {
-    if (!text) return;
-
-    // Cancel any ongoing speech
-    window.speechSynthesis.cancel();
-
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.rate = 0.9;
-    utterance.pitch = 1;
-    utterance.volume = 1;
-
-    utterance.onstart = () => setIsSpeaking(true);
-    utterance.onend = () => setIsSpeaking(false);
-    utterance.onerror = () => setIsSpeaking(false);
-
-    speechSynthesisRef.current = utterance;
-    window.speechSynthesis.speak(utterance);
-  };
-
-  const stopSpeaking = () => {
-    window.speechSynthesis.cancel();
-    setIsSpeaking(false);
   };
 
   const startNewChat = async () => {
@@ -304,7 +276,7 @@ function ChatContent() {
   };
 
   const handleFeedback = (messageId: string, isPositive: boolean) => {
-    toast.success(isPositive ? "Thanks for the thumbs up!" : "Thanks for the feedback!");
+    toast.success(isPositive ? "Thanks for the feedback!" : "Thanks for the feedback!");
   };
 
   const generateChatTitle = (firstMessage: string): string => {
@@ -583,15 +555,6 @@ function ChatContent() {
                   title="Copy Response"
                 >
                   <Copy className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => isSpeaking ? stopSpeaking() : speakText(msg.content.replace(/\*\*/g, '').replace(/\*/g, ''))}
-                  className={`text-muted-foreground hover:text-foreground h-6 w-6 ${isSpeaking ? 'text-purple-600' : ''}`}
-                  title={isSpeaking ? "Stop Reading" : "Read Aloud"}
-                >
-                  {isSpeaking ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
                 </Button>
                 <Button
                   variant="ghost"
