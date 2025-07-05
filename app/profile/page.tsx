@@ -1,21 +1,30 @@
 "use client";
 
-import type React from "react";
-import { useState, useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Sidebar } from "@/components/sidebar";
 import { AuthGuard } from "@/components/auth-guard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Avatar,
+  AvatarFallback,
+  AvatarImage,
+} from "@/components/ui/avatar";
 import { Menu, User, Palette, Bell, Shield, Database, Camera } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
-import { updateUserProfile, uploadProfilePicture, type UserProfile as FirestoreUserProfile } from "@/lib/firestore";
+import { updateUserProfile, type UserProfile as FirestoreUserProfile } from "@/lib/firestore";
 import { toast } from "sonner";
 
-// Extend the UserProfile type locally to include all preference fields used in this file
+// 🔒 Type Definitions
 type ExtendedPreferences = {
   theme: "dark" | "light";
   notifications: boolean;
@@ -44,7 +53,12 @@ export default function ProfilePage() {
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const { user, userProfile } = useAuth() as { user: any, userProfile: ExtendedUserProfile | null };
+  const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const { user, userProfile } = useAuth() as {
+    user: any;
+    userProfile: ExtendedUserProfile | null;
+  };
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [formData, setFormData] = useState({
@@ -73,7 +87,7 @@ export default function ProfilePage() {
     },
   });
 
-  // Initialize form with user profile data
+  // ⏬ Initialize form with user profile data
   useEffect(() => {
     if (userProfile) {
       setFormData({
@@ -101,10 +115,11 @@ export default function ProfilePage() {
           saveConversations: userProfile.preferences?.saveConversations ?? true,
         },
       });
+      setPreviewUrl(userProfile.photoURL || null);
     }
   }, [userProfile]);
 
-  // Warn about unsaved changes when leaving the page
+  // ⏳ Warn about unsaved changes
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       if (hasUnsavedChanges) {
@@ -112,12 +127,11 @@ export default function ProfilePage() {
         e.returnValue = "You have unsaved changes. Are you sure you want to leave?";
       }
     };
-
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [hasUnsavedChanges]);
 
-  // Validate form fields
+  // 🔍 Validate form fields
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
 
@@ -141,7 +155,7 @@ export default function ProfilePage() {
     return Object.keys(newErrors).length === 0;
   };
 
-  // Handle form input changes
+  // ✍️ Handle form input changes
   const handleInputChange = (field: string, value: string | boolean) => {
     setFormData((prev) => ({
       ...prev,
@@ -150,7 +164,7 @@ export default function ProfilePage() {
     setHasUnsavedChanges(true);
   };
 
-  // Handle preference changes
+  // ⚙️ Handle preference changes
   const handlePreferenceChange = (key: string, value: boolean | string) => {
     setFormData((prev) => ({
       ...prev,
@@ -162,7 +176,22 @@ export default function ProfilePage() {
     setHasUnsavedChanges(true);
   };
 
-  // Update profile in Firestore
+  // 📸 Handle profile picture change
+  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > MAX_FILE_SIZE) {
+      toast.error("File size must be less than 2MB");
+      return;
+    }
+
+    setSelectedImageFile(file);
+    setPreviewUrl(URL.createObjectURL(file));
+    setHasUnsavedChanges(true);
+  };
+
+  // 💾 Update profile in Firestore
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user || !validateForm()) {
@@ -196,40 +225,37 @@ export default function ProfilePage() {
         preferences: formData.preferences,
       };
 
+      // ⬆️ Upload image to Cloudinary if selected
+      if (selectedImageFile) {
+        setUploadingPhoto(true);
+        const imageForm = new FormData();
+        imageForm.append("file", selectedImageFile);
+        imageForm.append("upload_preset", "medibot_uploads");
+
+        const res = await fetch("https://api.cloudinary.com/v1_1/dygmrde1v/image/upload", {
+          method: "POST",
+          body: imageForm,
+        });
+
+        const data = await res.json();
+        if (!data.secure_url) throw new Error("Cloudinary upload failed");
+        updateData.photoURL = data.secure_url;
+      }
+
       await updateUserProfile(user.uid, updateData);
       setHasUnsavedChanges(false);
+      setSelectedImageFile(null);
       toast.success("Profile updated successfully!");
     } catch (error) {
       console.error("Error updating profile:", error);
       toast.error("Failed to update profile");
     } finally {
       setLoading(false);
-    }
-  };
-
-  // Handle profile picture upload
-  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !user) return;
-
-    if (file.size > MAX_FILE_SIZE) {
-      toast.error("File size must be less than 2MB");
-      return;
-    }
-
-    setUploadingPhoto(true);
-    try {
-      await uploadProfilePicture(user.uid, file);
-      toast.success("Profile picture updated successfully!");
-    } catch (error) {
-      console.error("Error uploading photo:", error);
-      toast.error("Failed to upload profile picture");
-    } finally {
       setUploadingPhoto(false);
     }
   };
 
-  // Export user data
+  // 📤 Export user data
   const handleExportData = () => {
     const exportData = {
       profile: userProfile,
@@ -250,7 +276,7 @@ export default function ProfilePage() {
     toast.success("Data exported successfully!");
   };
 
-  // Clear user data (placeholder)
+  // 🗑️ Clear user data (placeholder)
   const handleClearData = () => {
     if (window.confirm("Are you sure you want to clear all your data? This action cannot be undone.")) {
       toast.success("Data clearing initiated. This feature will be implemented soon.");
@@ -287,14 +313,14 @@ export default function ProfilePage() {
                 <Card className="bg-card border-border rounded-xl shadow">
                   <CardHeader className="flex flex-row items-center space-y-0 pb-4">
                     <User className="h-5 w-5 text-muted-foreground mr-2" />
-<CardTitle className="text-foreground">Profile Settings</CardTitle>
+                    <CardTitle className="text-foreground">Profile Settings</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <form onSubmit={handleUpdateProfile} className="space-y-6">
                       {/* Profile Picture */}
                       <div className="flex items-center space-x-6">
                         <Avatar className="w-20 h-20">
-                          <AvatarImage src={userProfile?.photoURL || user?.photoURL || ""} />
+                          <AvatarImage src={previewUrl || userProfile?.photoURL || ""} />
                           <AvatarFallback className="bg-purple-600 text-white text-2xl font-semibold">
                             {formData.displayName?.charAt(0).toUpperCase() || user?.email?.charAt(0).toUpperCase() || "U"}
                           </AvatarFallback>
@@ -324,7 +350,7 @@ export default function ProfilePage() {
                             ref={fileInputRef}
                             type="file"
                             accept="image/*"
-                            onChange={handlePhotoUpload}
+                            onChange={handlePhotoChange}
                             className="hidden"
                             aria-hidden="true"
                           />
@@ -431,7 +457,8 @@ export default function ProfilePage() {
 
                       {/* Emergency Contact */}
                       <div className="space-y-4">
-<h3 className="text-lg font-bold text-foreground">Emergency Contact</h3>                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <h3 className="text-lg font-bold text-foreground">Emergency Contact</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                           <div>
                             <label htmlFor="emergencyContactName" className="block text-sm font-medium text-muted-foreground mb-1">
                               Contact Name
@@ -489,7 +516,7 @@ export default function ProfilePage() {
 
                       {/* Medical Information */}
                       <div className="space-y-4">
-<h3 className="text-lg font-bold text-foreground">Medical Information</h3>
+                        <h3 className="text-lg font-bold text-foreground">Medical Information</h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <div>
                             <label htmlFor="allergies" className="block text-sm font-medium text-muted-foreground mb-1">
@@ -557,8 +584,6 @@ export default function ProfilePage() {
                   </CardContent>
                 </Card>
 
-               
-
                 {/* Notifications */}
                 <Card className="bg-card border-border rounded-xl shadow">
                   <CardHeader className="flex flex-row items-center space-y-0 pb-4">
@@ -568,8 +593,7 @@ export default function ProfilePage() {
                   <CardContent className="space-y-6">
                     <div className="flex items-center justify-between">
                       <div>
-                       <p className="text-muted-foreground text-sm">
-Medication Reminders</p>
+                        <p className="text-muted-foreground text-sm">Medication Reminders</p>
                         <p className="text-muted-foreground text-sm">Get notified to take your medications</p>
                       </div>
                       <Switch
@@ -580,8 +604,7 @@ Medication Reminders</p>
                     </div>
                     <div className="flex items-center justify-between">
                       <div>
-                       <p className="text-muted-foreground text-sm">
-Appointment Reminders</p>
+                        <p className="text-muted-foreground text-sm">Appointment Reminders</p>
                         <p className="text-muted-foreground text-sm">Reminders for upcoming medical appointments</p>
                       </div>
                       <Switch
@@ -592,8 +615,7 @@ Appointment Reminders</p>
                     </div>
                     <div className="flex items-center justify-between">
                       <div>
-                       <p className="text-muted-foreground text-sm">
-Health Tips</p>
+                        <p className="text-muted-foreground text-sm">Health Tips</p>
                         <p className="text-muted-foreground text-sm">General health tips and wellness advice</p>
                       </div>
                       <Switch
@@ -604,8 +626,7 @@ Health Tips</p>
                     </div>
                     <div className="flex items-center justify-between">
                       <div>
-                       <p className="text-muted-foreground text-sm">
-Email Notifications</p>
+                        <p className="text-muted-foreground text-sm">Email Notifications</p>
                         <p className="text-muted-foreground text-sm">Receive notifications via email</p>
                       </div>
                       <Switch
@@ -616,8 +637,7 @@ Email Notifications</p>
                     </div>
                     <div className="flex items-center justify-between">
                       <div>
-                       <p className="text-muted-foreground text-sm">
-Push Notifications</p>
+                        <p className="text-muted-foreground text-sm">Push Notifications</p>
                         <p className="text-muted-foreground text-sm">Receive push notifications on your device</p>
                       </div>
                       <Switch
@@ -633,12 +653,12 @@ Push Notifications</p>
                 <Card className="bg-card border-border rounded-xl shadow">
                   <CardHeader className="flex flex-row items-center space-y-0 pb-4">
                     <Shield className="h-5 w-5 text-muted-foreground mr-2" />
-<CardTitle className="text-foreground">Privacy & Security</CardTitle>                  </CardHeader>
+                    <CardTitle className="text-foreground">Privacy & Security</CardTitle>
+                  </CardHeader>
                   <CardContent className="space-y-6">
                     <div className="flex items-center justify-between">
                       <div>
-                       <p className="text-muted-foreground text-sm">
-Share Data for Research</p>
+                        <p className="text-muted-foreground text-sm">Share Data for Research</p>
                         <p className="text-muted-foreground text-sm">Help improve healthcare by sharing anonymized data</p>
                       </div>
                       <Switch
@@ -649,8 +669,7 @@ Share Data for Research</p>
                     </div>
                     <div className="flex items-center justify-between">
                       <div>
-                       <p className="text-muted-foreground text-sm">
-Save Conversations</p>
+                        <p className="text-muted-foreground text-sm">Save Conversations</p>
                         <p className="text-muted-foreground text-sm">Keep chat history for future reference</p>
                       </div>
                       <Switch
@@ -666,7 +685,7 @@ Save Conversations</p>
                 <Card className="bg-card border-border rounded-xl shadow">
                   <CardHeader className="flex flex-row items-center space-y-0 pb-4">
                     <Database className="h-5 w-5 text-muted-foreground mr-2" />
-<CardTitle className="text-foreground">Data Management</CardTitle>
+                    <CardTitle className="text-foreground">Data Management</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-4">
@@ -687,7 +706,7 @@ Save Conversations</p>
                         🗑️ Clear All Data
                       </Button>
                     </div>
-                    <p className="text-muted-foreground ">
+                    <p className="text-muted-foreground">
                       Export your data to keep a backup, or clear all your data to start fresh.
                     </p>
                   </CardContent>
