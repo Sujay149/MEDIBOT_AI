@@ -318,7 +318,7 @@ export default function MedicationsPage() {
         sendMedicationReminder(user.uid, medication.name, medication.enableWhatsApp ? medication.phoneNumber : undefined, medication.enableWhatsApp),
       ];
       await Promise.all(notifications);
-      toast.success("Test notifications sent successfully! 📱📧📲");
+      toast.success("Notifications sent successfully! 📱📧📲");
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       if (user) {
