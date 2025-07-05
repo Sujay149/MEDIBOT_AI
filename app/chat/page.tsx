@@ -41,6 +41,7 @@ import {
   Pill,
   AlertCircle,
   Volume2,
+  VolumeX,
 } from "lucide-react";
 
 interface PrescriptionAnalysis {
@@ -77,38 +78,16 @@ function ChatContent() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [fileName, setFileName] = useState<string>("");
   const [isSpeaking, setIsSpeaking] = useState(false);
-  const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
-  const [selectedVoice, setSelectedVoice] = useState<string>("");
+  const speechSynthesisRef = useRef<SpeechSynthesisUtterance | null>(null);
   const { user, userProfile } = useAuth();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const speechSynthesisRef = useRef<SpeechSynthesisUtterance | null>(null);
   const searchParams = useSearchParams();
-
-  // Load available voices for text-to-speech
-  useEffect(() => {
-    if ("speechSynthesis" in window) {
-      const loadVoices = () => {
-        const voices = window.speechSynthesis.getVoices();
-        setAvailableVoices(voices);
-        if (voices.length > 0 && !selectedVoice) {
-          setSelectedVoice(voices[0].name);
-        }
-      };
-      loadVoices();
-      window.speechSynthesis.onvoiceschanged = loadVoices;
-      return () => {
-        window.speechSynthesis.onvoiceschanged = null;
-      };
-    }
-  }, [selectedVoice]);
 
   useEffect(() => {
     if (!user) return;
 
     const sessionId = searchParams ? searchParams.get("sessionId") : null;
-    const storedSessionId = sessionStorage.getItem("currentSessionId");
-
     const unsubscribe = subscribeToUserChatSessions(user.uid, (userSessions) => {
       const normalizedSessions = userSessions.map((session) => ({
         ...session,
@@ -116,59 +95,34 @@ function ChatContent() {
       }));
       setSessions(normalizedSessions);
 
-      const loadSession = async () => {
-        try {
-          // Check if a session ID is provided in the URL
-          if (sessionId) {
+      if (sessionId) {
+        const loadSession = async () => {
+          try {
             const session = await getChatSessionById(sessionId);
             if (session && session.userId === user.uid) {
               setCurrentSession(session);
-              sessionStorage.setItem("currentSessionId", sessionId);
             } else {
               toast.error("Chat session not found or access denied");
-              await loadNewSession();
+              if (normalizedSessions.length > 0) {
+                setCurrentSession(normalizedSessions[0]);
+              }
+            }
+          } catch (error) {
+            console.error("Error loading chat session:", error);
+            toast.error("Failed to load chat session");
+            if (normalizedSessions.length > 0) {
+              setCurrentSession(normalizedSessions[0]);
             }
           }
-          // Check for stored session in sessionStorage
-          else if (storedSessionId && storedSessionId !== "temporary") {
-            const session = await getChatSessionById(storedSessionId);
-            if (session && session.userId === user.uid) {
-              setCurrentSession(session);
-            } else {
-              sessionStorage.removeItem("currentSessionId");
-              await loadNewSession();
-            }
-          }
-          // No session in URL or storage, create a new temporary session
-          else {
-            await loadNewSession();
-          }
-        } catch (error) {
-          console.error("Error loading chat session:", error);
-          toast.error("Failed to load chat session");
-          await loadNewSession();
-        }
-      };
-
-      loadSession();
+        };
+        loadSession();
+      } else if (!currentSession && normalizedSessions.length > 0) {
+        setCurrentSession(normalizedSessions[0]);
+      }
     });
 
     return () => unsubscribe();
   }, [user, searchParams]);
-
-  const loadNewSession = async () => {
-    if (!user) return;
-    const tempSession: ChatSession = {
-      id: null, // Null ID indicates unsaved session
-      userId: user.uid,
-      title: "New Chat",
-      messages: [],
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-    setCurrentSession(tempSession);
-    sessionStorage.setItem("currentSessionId", "temporary");
-  };
 
   useEffect(() => {
     scrollToBottom();
@@ -178,6 +132,30 @@ function ChatContent() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
+  const speakText = (text: string) => {
+    if (!text) return;
+
+    // Cancel any ongoing speech
+    window.speechSynthesis.cancel();
+
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.rate = 0.9;
+    utterance.pitch = 1;
+    utterance.volume = 1;
+
+    utterance.onstart = () => setIsSpeaking(true);
+    utterance.onend = () => setIsSpeaking(false);
+    utterance.onerror = () => setIsSpeaking(false);
+
+    speechSynthesisRef.current = utterance;
+    window.speechSynthesis.speak(utterance);
+  };
+
+  const stopSpeaking = () => {
+    window.speechSynthesis.cancel();
+    setIsSpeaking(false);
+  };
+
   const startNewChat = async () => {
     if (!user) {
       toast.error("Please log in to start a new chat");
@@ -185,16 +163,17 @@ function ChatContent() {
     }
 
     try {
-      const tempSession: ChatSession = {
-        id: null,
+      const sessionId = await createChatSession(user.uid, "New Chat");
+      const newSession: ChatSession = {
+        id: sessionId,
         userId: user.uid,
         title: "New Chat",
         messages: [],
         createdAt: new Date(),
         updatedAt: new Date(),
       };
-      setCurrentSession(tempSession);
-      sessionStorage.setItem("currentSessionId", "temporary");
+
+      setCurrentSession(newSession);
       toast.success("New chat started!");
     } catch (error) {
       console.error("Error starting new chat:", error);
@@ -220,8 +199,7 @@ function ChatContent() {
     try {
       let sessionToUse = currentSession;
 
-      // If session is temporary (not saved), create it in Firestore
-      if (!sessionToUse?.id) {
+      if (!sessionToUse) {
         const smartTitle = message.trim() ? generateChatTitle(message) : "Image Analysis";
         const sessionId = await createChatSession(user.uid, smartTitle);
         sessionToUse = {
@@ -233,7 +211,6 @@ function ChatContent() {
           updatedAt: new Date(),
         };
         setCurrentSession(sessionToUse);
-        sessionStorage.setItem("currentSessionId", sessionId);
       } else if (sessionToUse.title === "New Chat" && message.trim()) {
         const smartTitle = generateChatTitle(message);
         await updateChatSessionTitle(sessionToUse.id!, smartTitle);
@@ -327,37 +304,7 @@ function ChatContent() {
   };
 
   const handleFeedback = (messageId: string, isPositive: boolean) => {
-    toast.success(isPositive ? "Thanks for the feedback!" : "Thanks for the feedback!");
-  };
-
-  const handleSpeak = (text: string) => {
-    if ("speechSynthesis" in window) {
-      if (isSpeaking) {
-        window.speechSynthesis.cancel();
-        setIsSpeaking(false);
-        return;
-      }
-
-      const utterance = new SpeechSynthesisUtterance(text);
-      const voice = availableVoices.find((v) => v.name === selectedVoice);
-      if (voice) {
-        utterance.voice = voice;
-      }
-      utterance.lang = voice?.lang || "en-US";
-      utterance.volume = 1;
-      utterance.rate = 1;
-      utterance.pitch = 1;
-
-      utterance.onend = () => {
-        setIsSpeaking(false);
-      };
-
-      speechSynthesisRef.current = utterance;
-      window.speechSynthesis.speak(utterance);
-      setIsSpeaking(true);
-    } else {
-      toast.error("Text-to-speech is not supported in this browser.");
-    }
+    toast.success(isPositive ? "Thanks for the thumbs up!" : "Thanks for the feedback!");
   };
 
   const generateChatTitle = (firstMessage: string): string => {
@@ -640,11 +587,11 @@ function ChatContent() {
                 <Button
                   variant="ghost"
                   size="icon"
-                  onClick={() => handleSpeak(msg.content)}
-                  className={`text-muted-foreground hover:text-foreground h-6 w-6 ${isSpeaking ? 'text-blue-500' : ''}`}
+                  onClick={() => isSpeaking ? stopSpeaking() : speakText(msg.content.replace(/\*\*/g, '').replace(/\*/g, ''))}
+                  className={`text-muted-foreground hover:text-foreground h-6 w-6 ${isSpeaking ? 'text-purple-600' : ''}`}
                   title={isSpeaking ? "Stop Reading" : "Read Aloud"}
                 >
-                  <Volume2 className="h-4 w-4" />
+                  {isSpeaking ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
                 </Button>
                 <Button
                   variant="ghost"
@@ -709,7 +656,8 @@ function ChatContent() {
               <AvatarFallback className="bg-purple-600 text-white text-xs sm:text-sm">
                 {userProfile?.displayName?.charAt(0).toUpperCase() ||
                   user?.displayName?.charAt(0).toUpperCase() ||
-                  user?.email?.charAt(0).toUpperCase() || "U"}
+                  user?.email?.charAt(0).toUpperCase() ||
+                  "U"}
               </AvatarFallback>
             </Avatar>
           </div>
@@ -884,7 +832,7 @@ function ChatContent() {
                         onChange={(e) => setMessage(e.target.value)}
                         onKeyPress={handleKeyPress}
                         placeholder="Ask a health question or upload an image..."
-                        className="bg-muted border-border text-foreground placeholder-muted-foreground h-10 sm:h-11 md:h-12 rounded-xl pr-48 sm:pr-52 text-xs sm:text-sm md:text-base focus:outline-none focus:ring-2 focus:ring-purple-600"
+                        className="bg-muted border-border text-foreground placeholder-muted-foreground h-10 sm:h-11 md:h-12 rounded-xl pr-36 sm:pr-40 text-xs sm:text-sm md:text-base focus:outline-none focus:ring-2 focus:ring-purple-600"
                         disabled={loading}
                         maxLength={1000}
                       />
@@ -914,18 +862,6 @@ function ChatContent() {
                             <SelectItem value="gemini-1.5-flash-latest">Gemini 1.5 Flash</SelectItem>
                             <SelectItem value="gemini-1.5-pro-latest">Gemini 1.5 Pro</SelectItem>
                             <SelectItem value="grok">Grok (Beta)</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <Select value={selectedVoice} onValueChange={setSelectedVoice}>
-                          <SelectTrigger className="w-[100px] sm:w-[120px] bg-muted border-border text-foreground text-xs h-6 sm:h-7 focus:outline-none focus:ring-2 focus:ring-purple-600">
-                            <SelectValue placeholder="Voice" />
-                          </SelectTrigger>
-                          <SelectContent className="bg-card border-border text-foreground text-xs shadow-lg">
-                            {availableVoices.map((voice) => (
-                              <SelectItem key={voice.name} value={voice.name}>
-                                {voice.name} ({voice.lang})
-                              </SelectItem>
-                            ))}
                           </SelectContent>
                         </Select>
                       </div>
@@ -1150,7 +1086,6 @@ function ChatContent() {
                         }`}
                         onClick={() => {
                           setCurrentSession(session);
-                          sessionStorage.setItem("currentSessionId", session.id!);
                           setHistoryDialogOpen(false);
                         }}
                       >
