@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from "next/link";
@@ -38,21 +39,30 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
 
+  // Debug: Log userProfile changes
+  useEffect(() => {
+    console.log("Sidebar: userProfile updated", {
+      photoURL: userProfile?.photoURL,
+      displayName: userProfile?.displayName,
+      email: user?.email,
+    });
+  }, [userProfile, user]);
+
   useEffect(() => {
     setMounted(true);
-    
+
     const checkIfMobile = () => {
       setIsMobile(window.innerWidth < 1024);
       if (window.innerWidth < 1024) {
         setCollapsed(false);
       }
     };
-    
+
     checkIfMobile();
-    window.addEventListener('resize', checkIfMobile);
-    
+    window.addEventListener("resize", checkIfMobile);
+
     return () => {
-      window.removeEventListener('resize', checkIfMobile);
+      window.removeEventListener("resize", checkIfMobile);
     };
   }, []);
 
@@ -82,6 +92,7 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
 
   const toggleSidebar = () => {
     setSidebarOpen((prev) => !prev);
+    if (onClose && !sidebarOpen) onClose();
   };
 
   const toggleCollapse = () => {
@@ -91,6 +102,7 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
   const handleOverlayClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (e.target === e.currentTarget) {
       setSidebarOpen(false);
+      if (onClose) onClose();
     }
   };
 
@@ -131,8 +143,8 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
             collapsed && "lg:w-[80px]"
           )}
           style={{
-            height: '100vh',
-            position: isMobile ? 'fixed' : 'sticky',
+            height: "100vh",
+            position: isMobile ? "fixed" : "sticky",
             top: 0,
           }}
         >
@@ -141,25 +153,26 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
               <div className="flex items-center justify-between mb-8">
                 <div className="flex items-center space-x-3">
                   <div className="w-8 h-8 relative">
-                    <Image 
-                      src="/logo.png" 
-                      alt="MedBot Logo" 
-                      width={32} 
-                      height={32} 
-                      className="rounded-full" 
+                    <Image
+                      src="/logo.png"
+                      alt="MedBot Logo"
+                      width={32}
+                      height={32}
+                      className="rounded-full"
                     />
                   </div>
                   {!collapsed && (
                     <span className="text-foreground font-semibold text-lg">Medibot</span>
                   )}
                 </div>
-                
+
                 {isMobile ? (
                   <Button
                     variant="ghost"
                     size="icon"
                     onClick={() => setSidebarOpen(false)}
                     className="h-8 w-8"
+                    aria-label="Close sidebar"
                   >
                     <X className="h-4 w-4" />
                   </Button>
@@ -181,8 +194,10 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
               {!collapsed && (
                 <div className="bg-muted rounded-xl p-4 mb-6 border border-border">
                   <div className="flex items-center space-x-3">
-                    <Avatar className="w-12 h-12">
-                      <AvatarImage src={userProfile?.photoURL || user?.photoURL || ""} />
+                    <Avatar className="w-12 h-12" key={userProfile?.photoURL || "default"}>
+                      <AvatarImage
+                        src={userProfile?.photoURL ? `${userProfile.photoURL}?t=${Date.now()}` : user?.photoURL || ""}
+                      />
                       <AvatarFallback className="bg-purple-600 text-white font-semibold">
                         {userProfile?.displayName?.charAt(0).toUpperCase() ||
                           user?.displayName?.charAt(0).toUpperCase() ||
@@ -210,24 +225,23 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
                   return (
                     <Link key={item.href} href={item.href} legacyBehavior>
                       <a>
-                       
-<Button
-  variant="ghost"
-  className={cn(
-    "w-full justify-start text-left h-12 rounded-xl transition-all duration-200",
-    "flex items-center font-sans", // Added font-sans here (or your preferred font class)
-    isActive
-      ? "bg-purple-600 text-white shadow"
-      : "text-muted-foreground hover:text-foreground hover:bg-muted",
-    collapsed ? "justify-center" : "px-4"
-  )}
-  title={collapsed ? item.label : undefined}
->
-  <item.icon className="h-5 w-5 flex-shrink-0" />
-  {!collapsed && (
-    <span className="ml-3 font-medium">{item.label}</span> // Added font-medium here
-  )}
-</Button>
+                        <Button
+                          variant="ghost"
+                          className={cn(
+                            "w-full justify-start text-left h-12 rounded-xl transition-all duration-200",
+                            "flex items-center font-sans",
+                            isActive
+                              ? "bg-purple-600 text-white shadow"
+                              : "text-muted-foreground hover:text-foreground hover:bg-muted",
+                            collapsed ? "justify-center" : "px-4"
+                          )}
+                          title={collapsed ? item.label : undefined}
+                        >
+                          <item.icon className="h-5 w-5 flex-shrink-0" />
+                          {!collapsed && (
+                            <span className="ml-3 font-medium">{item.label}</span>
+                          )}
+                        </Button>
                       </a>
                     </Link>
                   );
