@@ -198,7 +198,7 @@ function ChatContent() {
         botResponse = await generateAIResponse(message, selectedModel);
       }
       if (selectedFile) {
-        const analysis = await analyzePrescription(selectedFile);
+        const analysis = await analyzePrescription(selectedFile, selectedModel);
         const analysisText = `**Prescription Analysis**:\n- **Medications**: ${analysis.medications.join(", ")}\n- **Dosages**: ${analysis.dosages.join(", ")}\n- **Instructions**: ${analysis.instructions}${analysis.warnings.length ? "\n- **Warnings**: " + analysis.warnings.join(", ") : ""}`;
         botResponse = botResponse ? `${botResponse}\n\n${analysisText}` : analysisText;
       }
@@ -395,27 +395,32 @@ const generateAIResponse = async (userMessage: string, selectedModel: string): P
 };
 
 
-  const analyzePrescription = async (file: File): Promise<PrescriptionAnalysis> => {
-    try {
-      const endpoint = selectedModel === "grok"
-        ? "https://api.x.ai/v1/models/grok:analyzePrescription"
-        : `https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:generateContent`;
+const analyzePrescription = async (file: File, selectedModel: string): Promise<PrescriptionAnalysis> => {
+  try {
+    const base64Data = await fileToBase64(file);
 
+    const prompt = `Analyze this prescription image and extract medications, dosages, instructions, and any warnings. Return the response in JSON format with fields: medications (array), dosages (array), instructions (string), warnings (array).`;
+
+    const fullPrompt = `${prompt}\n\nHere is the image in base64:\ndata:${file.type};base64,${base64Data}`;
+
+    const isGeminiModel = selectedModel.startsWith("gemini");
+
+    // ✅ GEMINI FLOW
+    if (isGeminiModel) {
       const response = await fetch(
-        `${endpoint}?key=${process.env.NEXT_PUBLIC_GEMINI_API_KEY}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:generateContent?key=${process.env.NEXT_PUBLIC_GEMINI_API_KEY}`,
         {
           method: "POST",
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             contents: [
               {
                 parts: [
-                  {
-                    text: `Analyze this prescription image and extract medications, dosages, instructions, and any warnings. Return the response in JSON format with fields: medications (array), dosages (array), instructions (string), warnings (array).`,
-                  },
+                  { text: prompt },
                   {
                     inlineData: {
                       mimeType: file.type,
-                      data: await fileToBase64(file),
+                      data: base64Data,
                     },
                   },
                 ],
@@ -430,23 +435,20 @@ const generateAIResponse = async (userMessage: string, selectedModel: string): P
       );
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        throw new Error(`Gemini HTTP error! status: ${response.status}`);
       }
 
       const data = await response.json();
-      let responseText = data.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
-      responseText = responseText
-        .replace(/```json/g, "")
-        .replace(/```/g, "")
-        .replace(/`/g, "")
-        .trim();
+      let responseText = data?.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
+
+      responseText = responseText.replace(/```json|```|`/g, "").trim();
 
       let result;
       try {
         result = JSON.parse(responseText);
       } catch (parseError) {
-        console.error("JSON parse error:", parseError);
-        throw new Error("Invalid JSON response");
+        console.error("Gemini JSON parse error:", parseError, responseText);
+        throw new Error("Invalid JSON from Gemini");
       }
 
       return {
@@ -455,16 +457,57 @@ const generateAIResponse = async (userMessage: string, selectedModel: string): P
         instructions: result.instructions || "No instructions provided.",
         warnings: result.warnings || [],
       };
-    } catch (error) {
-      console.error("Error analyzing prescription:", error);
-      return {
-        medications: ["Error"],
-        dosages: ["N/A"],
-        instructions: "Failed to analyze prescription.",
-        warnings: ["Please try again or consult a healthcare professional."],
-      };
     }
-  };
+
+    // ✅ GROK / GPT-4o FLOW (PUTER.JS)
+    // Ensure Puter.js is loaded
+    if (typeof window !== "undefined" && !window.puter) {
+      await new Promise<void>((resolve, reject) => {
+        const script = document.createElement("script");
+        script.src = "https://js.puter.com/v2/";
+        script.onload = () => resolve();
+        script.onerror = () => reject("Failed to load Puter.js");
+        document.head.appendChild(script);
+      });
+    }
+
+    const response = await window.puter.ai.chat(fullPrompt, {
+      model: selectedModel, // supports gpt-4o, grok, etc.
+    });
+
+    let responseText = response?.message?.content || "{}";
+    responseText = responseText.replace(/```json|```|`/g, "").trim();
+
+    let result;
+    try {
+      result = JSON.parse(responseText);
+    } catch (parseError) {
+      console.error("Puter.js JSON parse error:", parseError, responseText);
+      throw new Error("Invalid JSON from Grok/OpenAI");
+    }
+
+    return {
+      medications: result.medications || ["Unknown"],
+      dosages: result.dosages || ["Unknown"],
+      instructions: result.instructions || "No instructions provided.",
+      warnings: result.warnings || [],
+    };
+  } catch (error) {
+    console.error("Error analyzing prescription:", {
+      message: (error as any)?.message || "Unknown error",
+      raw: error,
+    });
+
+    return {
+      medications: ["Error"],
+      dosages: ["N/A"],
+      instructions: "Failed to analyze prescription.",
+      warnings: ["Please try again or consult a healthcare professional."],
+    };
+  }
+};
+
+// Removed duplicate declaration of fileToBase64
 
   const fileToBase64 = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
@@ -941,7 +984,7 @@ const generateAIResponse = async (userMessage: string, selectedModel: string): P
                         const file = e.target.files?.[0];
                         if (file) {
                           setAnalyzingPrescription(true);
-                          analyzePrescription(file)
+                          analyzePrescription(file, selectedModel)
                             .then((analysis) => {
                               setAnalysisResult(analysis);
                               toast.success("Prescription analyzed successfully!");
