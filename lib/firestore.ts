@@ -1,4 +1,3 @@
-
 import {
   collection,
   doc,
@@ -13,6 +12,7 @@ import {
   serverTimestamp,
   onSnapshot,
   limit,
+  arrayUnion,
   type Timestamp,
 } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
@@ -58,7 +58,7 @@ export interface ChatMessage {
 }
 
 export interface ChatSession {
-   id?: string | null;
+  id?: string | null;
   userId: string;
   title: string;
   messages: ChatMessage[];
@@ -226,15 +226,16 @@ export const uploadProfilePicture = async (userId: string, file: File): Promise<
 export const createChatSession = async (userId: string, title: string) => {
   try {
     const chatRef = collection(db, "chatSessions");
-    const chatData = {
+    const chatData: Omit<ChatSession, "id"> = {
       userId,
       title: title.slice(0, 100),
       messages: [],
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
+      createdAt: serverTimestamp() as Timestamp,
+      updatedAt: serverTimestamp() as Timestamp,
     };
 
     const docRef = await addDoc(chatRef, chatData);
+    console.log("Created chat session with ID:", docRef.id);
     return docRef.id;
   } catch (error) {
     console.error("Error creating chat session:", error);
@@ -257,8 +258,8 @@ export const addMessageToSession = async (
       throw new Error("Session not found");
     }
 
-    const sessionData = sessionSnap.data() as ChatSession;
     const newMessage: ChatMessage = {
+      id: `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
       userId,
       message: message.slice(0, 1000),
       response: response.slice(0, 2000),
@@ -266,13 +267,12 @@ export const addMessageToSession = async (
       timestamp: new Date(),
     };
 
-    const updatedMessages = [...(sessionData.messages || []), newMessage];
-
     await updateDoc(sessionRef, {
-      messages: updatedMessages,
+      messages: arrayUnion(newMessage),
       updatedAt: serverTimestamp(),
     });
 
+    console.log("Added message to session:", sessionId, newMessage);
     return newMessage;
   } catch (error) {
     console.error("Error adding message to session:", error);
@@ -287,6 +287,7 @@ export const updateChatSessionTitle = async (sessionId: string, title: string) =
       title: title.slice(0, 100),
       updatedAt: serverTimestamp(),
     });
+    console.log("Updated session title:", sessionId, title);
   } catch (error) {
     console.error("Error updating chat session title:", error);
     throw new Error("Failed to update chat session title");
@@ -296,7 +297,7 @@ export const updateChatSessionTitle = async (sessionId: string, title: string) =
 export const getUserChatSessions = async (userId: string): Promise<ChatSession[]> => {
   try {
     const chatsRef = collection(db, "chatSessions");
-    const q = query(chatsRef, where("userId", "==", userId), limit(20));
+    const q = query(chatsRef, where("userId", "==", userId), limit(50));
 
     const querySnapshot = await getDocs(q);
     const sessions = querySnapshot.docs.map(
@@ -307,11 +308,8 @@ export const getUserChatSessions = async (userId: string): Promise<ChatSession[]
         }) as ChatSession,
     );
 
-    return sessions.sort((a, b) => {
-      const aTime = a.updatedAt instanceof Date ? a.updatedAt.getTime() : (a.updatedAt as any)?.seconds * 1000 || 0;
-      const bTime = b.updatedAt instanceof Date ? b.updatedAt.getTime() : (b.updatedAt as any)?.seconds * 1000 || 0;
-      return bTime - aTime;
-    });
+    console.log("Fetched sessions for user:", userId, sessions);
+    return sessions;
   } catch (error) {
     console.error("Error getting chat sessions:", error);
     return [];
@@ -337,6 +335,7 @@ export const deleteChatSession = async (sessionId: string) => {
   try {
     const sessionRef = doc(db, "chatSessions", sessionId);
     await deleteDoc(sessionRef);
+    console.log("Deleted session:", sessionId);
   } catch (error) {
     console.error("Error deleting chat session:", error);
     throw new Error("Failed to delete chat session");
@@ -349,7 +348,7 @@ export const subscribeToUserChatSessions = (
 ) => {
   try {
     const chatsRef = collection(db, "chatSessions");
-    const q = query(chatsRef, where("userId", "==", userId), limit(20));
+    const q = query(chatsRef, where("userId", "==", userId), limit(50));
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const sessions = snapshot.docs
@@ -359,18 +358,18 @@ export const subscribeToUserChatSessions = (
               id: doc.id,
               ...doc.data(),
             }) as ChatSession,
-        )
-        .sort((a, b) => {
-          const aTime = a.updatedAt instanceof Date ? a.updatedAt.getTime() : (a.updatedAt as any)?.seconds * 1000 || 0;
-          const bTime = b.updatedAt instanceof Date ? b.updatedAt.getTime() : (b.updatedAt as any)?.seconds * 1000 || 0;
-          return bTime - aTime;
-        });
+        );
+      console.log("Subscribed sessions for user:", userId, sessions);
       callback(sessions);
+    }, (error) => {
+      console.error("Error in subscribeToUserChatSessions:", error);
+      callback([]);
     });
 
     return unsubscribe;
   } catch (error) {
-    console.error("Error subscribing to chat sessions:", error);
+    console.error("Error setting up subscription:", error);
+    callback([]);
     return () => {};
   }
 };
@@ -408,7 +407,7 @@ export const analyzePrescription = async (
 export const getUserPrescriptionAnalyses = async (userId: string): Promise<PrescriptionAnalysis[]> => {
   try {
     const analysesRef = collection(db, "prescriptionAnalyses");
-    const q = query(analysesRef, where("userId", "==", userId), limit(20));
+    const q = query(analysesRef, where("userId", "==", userId), limit(50));
 
     const querySnapshot = await getDocs(q);
     const analyses = querySnapshot.docs.map(
@@ -580,7 +579,6 @@ export function sendMedicationReminder(
   phoneNumber?: string,
   enableWhatsApp?: boolean,
 ) {
-  // Implement your reminder logic using the above parameters
   console.log("Reminder:", userId, medicationName, phoneNumber, enableWhatsApp);
 }
 
