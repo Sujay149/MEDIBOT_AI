@@ -1,8 +1,14 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  reactStrictMode: true,
-  // REMOVE or COMMENT OUT this line if present:
-  // output: 'export',
-}
+  images: {
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "res.cloudinary.com",
+        pathname: "/dygmrde1v/**",
+      },
+    ],
+  },
+};
 
-export default nextConfig
+module.exports = nextConfig;

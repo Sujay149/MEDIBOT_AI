@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -28,6 +29,9 @@ import {
   FileText,
   Pill,
   AlertCircle,
+  Mic,
+  Volume2,
+  RefreshCw,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import {
@@ -47,6 +51,8 @@ import firebase from "firebase/firestore";
 declare global {
   interface Window {
     puter: any;
+    SpeechRecognition: any;
+    webkitSpeechRecognition: any;
   }
 }
 
@@ -66,7 +72,7 @@ interface ProcessedChatSession extends Omit<ChatSession, "createdAt" | "updatedA
   messages: Array<{
     id: string;
     userId: string;
-    image?: string;
+    image?: string | null;
     message: string;
     response: string;
     timestamp: Date;
@@ -89,12 +95,67 @@ export default function ChatPage() {
   const [selectedModel, setSelectedModel] = useState("gemini-1.5-flash-latest");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [fileName, setFileName] = useState("");
+  const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
   const { user, userProfile } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const recognitionRef = useRef<any>(null);
+  const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+
+  // Initialize Speech Recognition
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (SpeechRecognition) {
+        recognitionRef.current = new SpeechRecognition();
+        recognitionRef.current.continuous = false;
+        recognitionRef.current.interimResults = false;
+        recognitionRef.current.lang = "en-US";
+        recognitionRef.current.onresult = (event: any) => {
+          const transcript = event.results[0][0].transcript;
+          setMessage((prev) => (prev ? `${prev} ${transcript}` : transcript));
+          setIsRecording(false);
+        };
+        recognitionRef.current.onerror = (event: any) => {
+          console.error("Speech recognition error:", event.error);
+          toast.error(
+            event.error === "no-speech"
+              ? "No speech detected. Please try again."
+              : event.error === "not-allowed"
+              ? "Microphone access denied. Please allow microphone permissions."
+              : "Speech recognition failed. Try again or check browser support."
+          );
+          setIsRecording(false);
+        };
+        recognitionRef.current.onend = () => {
+          setIsRecording(false);
+        };
+      } else {
+        toast.error("Speech recognition is not supported in this browser. Please use Chrome or Edge.");
+      }
+    }
+  }, []);
+
+  // Request microphone permissions on mount
+  useEffect(() => {
+    if (typeof window !== "undefined" && navigator.permissions) {
+      navigator.permissions.query({ name: "microphone" as PermissionName }).then((permissionStatus) => {
+        if (permissionStatus.state === "denied") {
+          toast.error("Microphone access is denied. Please enable it in your browser settings.");
+        }
+        permissionStatus.onchange = () => {
+          if (permissionStatus.state === "denied") {
+            toast.error("Microphone access was revoked. Please enable it in your browser settings.");
+          }
+        };
+      });
+    }
+  }, []);
 
   // Normalize Firestore Timestamp to Date
   const normalizeSession = (session: ChatSession): ProcessedChatSession => {
@@ -106,6 +167,7 @@ export default function ChatPage() {
         timestamp: msg.timestamp instanceof Date
           ? msg.timestamp
           : (msg.timestamp as firebase.Timestamp)?.toDate?.() || new Date(),
+        image: msg.image ?? null, // Ensure image is string or null
       })),
       createdAt: session.createdAt instanceof Date
         ? session.createdAt
@@ -206,6 +268,34 @@ export default function ChatPage() {
     }
   };
 
+  const uploadImageToCloudinary = async (file: File): Promise<string | null> => {
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("upload_preset", "medibot_Uploads");
+
+      const response = await fetch(
+        `https://api.cloudinary.com/v1_1/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/image/upload`,
+        {
+          method: "POST",
+          body: formData,
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`Cloudinary upload failed: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      console.log("Uploaded image URL:", data.secure_url);
+      return data.secure_url || null;
+    } catch (error) {
+      console.error("Error uploading image to Cloudinary:", error);
+      toast.error("Failed to upload image");
+      return null;
+    }
+  };
+
   const handleSendMessage = async () => {
     if (!user) {
       toast.error("Please log in to send messages");
@@ -224,7 +314,7 @@ export default function ChatPage() {
     try {
       let sessionId = currentSession?.id;
       if (!sessionId) {
-        const smartTitle = message.trim() ? generateChatTitle(message) : "Image Analysis";
+        const smartTitle = message.trim() ? generateChatTitle(message) : "Image Chat";
         sessionId = await createChatSession(user.uid, smartTitle);
         const newSession: ProcessedChatSession = {
           id: sessionId,
@@ -243,13 +333,29 @@ export default function ChatPage() {
         console.log("Updated session title:", sessionId, smartTitle);
       }
 
+      let imageUrl: string | null = null;
+      if (selectedFile) {
+        imageUrl = await uploadImageToCloudinary(selectedFile);
+      }
+
+      // Log inputs to addMessageToSession
+      console.log("handleSendMessage: calling addMessageToSession with:", {
+        sessionId,
+        userId: user.uid,
+        userMessage,
+        response: "",
+        type: "chat",
+        image: imageUrl,
+      });
+
       const tempMessage: ProcessedChatSession["messages"][0] = {
         id: messageId,
         userId: user.uid,
         message: userMessage,
         response: "",
         timestamp: new Date(),
-        type: selectedFile ? "summarizer" : "chat",
+        type: "chat",
+        image: imageUrl ?? null,
       };
 
       setCurrentSession((prev) => {
@@ -270,13 +376,21 @@ export default function ChatPage() {
       if (message.trim()) {
         botResponse = await generateAIResponse(message, selectedModel);
       }
-      if (selectedFile) {
-        const analysis = await analyzePrescription(selectedFile, selectedModel);
-        const analysisText = `**Prescription Analysis**:\n- **Medications**: ${analysis.medications.join(", ")}\n- **Dosages**: ${analysis.dosages.join(", ")}\n- **Instructions**: ${analysis.instructions}${analysis.warnings.length ? "\n- **Warnings**: " + analysis.warnings.join(", ") : ""}`;
-        botResponse = botResponse ? `${botResponse}\n\n${analysisText}` : analysisText;
+      if (imageUrl) {
+        botResponse = botResponse ? `${botResponse}\n\n**Image received**` : "**Image received**";
       }
 
-      const newMessage = await addMessageToSession(sessionId!, user.uid, userMessage, botResponse, selectedFile ? "summarizer" : "chat");
+      // Log inputs again before final addMessageToSession call
+      console.log("handleSendMessage: final addMessageToSession with:", {
+        sessionId,
+        userId: user.uid,
+        userMessage,
+        botResponse,
+        type: "chat",
+        image: imageUrl,
+      });
+
+      const newMessage = await addMessageToSession(sessionId!, user.uid, userMessage, botResponse, "chat", imageUrl);
       console.log("Message added to session:", sessionId, newMessage);
 
       setCurrentSession((prev) => {
@@ -285,9 +399,11 @@ export default function ChatPage() {
           msg.id === messageId
             ? {
                 ...newMessage,
+                id: newMessage.id || uuidv4(),
                 timestamp: newMessage.timestamp instanceof Date
                   ? newMessage.timestamp
                   : (newMessage.timestamp as firebase.Timestamp).toDate(),
+                image: newMessage.image ?? null,
               }
             : msg
         );
@@ -321,6 +437,44 @@ export default function ChatPage() {
     }
   };
 
+  const handleRetryResponse = async (messageId: string, userMessage: string) => {
+    if (!user) {
+      toast.error("Please log in to retry responses");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const botResponse = await generateAIResponse(userMessage, selectedModel);
+      const sessionId = currentSession?.id;
+      if (sessionId) {
+        const existingMessage = currentSession!.messages.find((msg) => msg.id === messageId);
+        const updatedMessages = currentSession!.messages.map((msg) =>
+          msg.id === messageId ? { ...msg, response: botResponse } : msg
+        );
+
+        // Log inputs to addMessageToSession
+        console.log("handleRetryResponse: calling addMessageToSession with:", {
+          sessionId,
+          userId: user.uid,
+          userMessage,
+          botResponse,
+          type: "chat",
+          image: existingMessage?.image ?? null,
+        });
+
+        await addMessageToSession(sessionId, user.uid, userMessage, botResponse, "chat", existingMessage?.image ?? null);
+        setCurrentSession((prev) => (prev ? { ...prev, messages: updatedMessages } : prev));
+        toast.success("Response regenerated!");
+      }
+    } catch (error) {
+      console.error("Error retrying response:", error);
+      toast.error("Failed to regenerate response");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleEditMessage = async (messageId: string, originalMessage: string) => {
     if (!user) {
       toast.error("Please log in to edit messages");
@@ -338,10 +492,22 @@ export default function ChatPage() {
         const botResponse = await generateAIResponse(editedMessage, selectedModel);
         const sessionId = currentSession?.id;
         if (sessionId) {
+          const existingMessage = currentSession!.messages.find((msg) => msg.id === messageId);
           const updatedMessages = (currentSession?.messages ?? []).map((msg) =>
             msg.id === messageId ? { ...msg, message: editedMessage, response: botResponse } : msg
           );
-          await addMessageToSession(sessionId, user.uid, editedMessage, botResponse, "chat");
+
+          // Log inputs to addMessageToSession
+          console.log("handleEditMessage: calling addMessageToSession with:", {
+            sessionId,
+            userId: user.uid,
+            userMessage: editedMessage,
+            botResponse,
+            type: "chat",
+            image: existingMessage?.image ?? null,
+          });
+
+          await addMessageToSession(sessionId, user.uid, editedMessage, botResponse, "chat", existingMessage?.image ?? null);
           setCurrentSession((prev) => (prev ? { ...prev, messages: updatedMessages } : prev));
           if (currentSession?.messages[0]?.id === messageId) {
             const smartTitle = generateChatTitle(editedMessage);
@@ -357,11 +523,28 @@ export default function ChatPage() {
       } finally {
         setEditingMessageId(null);
         setEditedMessage("");
+        setSelectedMessageId(null);
         setLoading(false);
       }
     } else {
       setEditingMessageId(messageId);
       setEditedMessage(originalMessage);
+      setSelectedMessageId(messageId);
+    }
+  };
+
+  const handleFeedback = async (messageId: string, isPositive: boolean) => {
+    if (!user) {
+      toast.error("Please log in to provide feedback");
+      return;
+    }
+
+    try {
+      console.log(`Feedback for message ${messageId}: ${isPositive ? "Thumbs Up" : "Thumbs Down"}`);
+      toast.success(`Thank you for your ${isPositive ? "positive" : "negative"} feedback!`);
+    } catch (error) {
+      console.error("Error handling feedback:", error);
+      toast.error("Failed to submit feedback");
     }
   };
 
@@ -370,8 +553,61 @@ export default function ChatPage() {
     toast.success("Copied to clipboard!");
   };
 
-  const handleFeedback = (messageId: string, isPositive: boolean) => {
-    toast.success(isPositive ? "Thanks for the positive feedback!" : "Thanks for the feedback!");
+  const handleSpeakResponse = (text: string) => {
+    if (!("speechSynthesis" in window)) {
+      toast.error("Text-to-speech not supported in this browser");
+      return;
+    }
+
+    if (isSpeaking) {
+      window.speechSynthesis.cancel();
+      setIsSpeaking(false);
+      utteranceRef.current = null;
+      return;
+    }
+
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = "en-US";
+    utterance.rate = 1;
+    utterance.pitch = 1;
+    utterance.onend = () => {
+      setIsSpeaking(false);
+      utteranceRef.current = null;
+    };
+    utterance.onerror = (event) => {
+      console.error("Speech synthesis error:", event.error);
+      toast.error(`Text-to-speech failed: ${event.error}`);
+      setIsSpeaking(false);
+      utteranceRef.current = null;
+    };
+    utteranceRef.current = utterance;
+    window.speechSynthesis.speak(utterance);
+    setIsSpeaking(true);
+  };
+
+  const handleToggleRecording = () => {
+    if (!user) {
+      toast.error("Please log in to use speech input");
+      return;
+    }
+    if (!recognitionRef.current) {
+      toast.error("Speech recognition not supported in this browser. Please use Chrome or Edge.");
+      return;
+    }
+    if (isRecording) {
+      recognitionRef.current.stop();
+      setIsRecording(false);
+    } else {
+      try {
+        recognitionRef.current.start();
+        setIsRecording(true);
+      } catch (error) {
+        console.error("Error starting speech recognition:", error);
+        toast.error("Failed to start speech recognition. Check microphone permissions.");
+        setIsRecording(false);
+      }
+    }
   };
 
   const generateChatTitle = (firstMessage: string): string => {
@@ -408,8 +644,8 @@ export default function ChatPage() {
 
   const sendMessageNotification = (userMessage: string, botResponse: string) => {
     if ("Notification" in window && Notification.permission === "granted") {
-      new Notification("Medibot Response", {
-        body: "Your health question has been answered",
+      new Notification("MediBot Response", {
+        body: "Your message has been answered",
         icon: "/logo.png",
         badge: "/logo.png",
       });
@@ -431,7 +667,7 @@ export default function ChatPage() {
         return "Model not recognized. Please select a valid model.";
       }
 
-      const prompt = `You are Medibot, a health-focused AI assistant. Provide a concise, informative, and professional response to the following health-related user query. Ensure the response is educational, not a substitute for professional medical advice, and includes a reminder to consult a healthcare professional for personalized advice. Query: ${userMessage}`;
+      const prompt = `You are MediBot, a health-focused AI assistant. Provide a concise, informative, and professional response to the following user query. Ensure the response is educational, not a substitute for professional medical advice, and includes a reminder to consult a healthcare professional for personalized advice. Query: ${userMessage}`;
 
       if (resolvedModel === "gemini-1.5-flash") {
         const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${resolvedModel}:generateContent`;
@@ -578,13 +814,9 @@ export default function ChatPage() {
       toast.error("Please log in to send messages");
       return;
     }
-    if (e.key === "Enter" && !e.shiftKey) {
+    if (e.key === "Enter" && !e.shiftKey && !editingMessageId) {
       e.preventDefault();
-      if (editingMessageId) {
-        handleEditMessage(editingMessageId, editedMessage);
-      } else {
-        handleSendMessage();
-      }
+      handleSendMessage();
     }
   };
 
@@ -665,42 +897,67 @@ export default function ChatPage() {
             }
           }
         `}</style>
-        <div className="flex justify-end items-start space-x-2 max-w-[70%] ml-auto">
-          <div className="bg-purple-600 rounded-2xl p-4 text-white text-sm leading-relaxed shadow-md">
+        <div
+          className="flex justify-end items-start space-x-2 max-w-[70%] ml-auto"
+          onClick={() => setSelectedMessageId(msg.id === selectedMessageId ? null : msg.id)}
+        >
+          <div className="bg-gray-200 dark:bg-gray-700 rounded-2xl p-4 text-foreground text-sm leading-relaxed shadow-md">
+            {msg.image && (
+              <div className="mb-2">
+                <Image
+                  src={msg.image}
+                  alt="Uploaded image"
+                  width={200}
+                  height={200}
+                  className="rounded-lg object-cover"
+                />
+              </div>
+            )}
             {editingMessageId === msg.id ? (
-              <Input
-                value={editedMessage}
-                onChange={(e) => setEditedMessage(e.target.value)}
-                onKeyPress={handleKeyPress}
-                className="bg-white/10 border-none text-white focus:outline-none focus:ring-2 focus:ring-purple-400 rounded-lg"
-                aria-label="Edit message"
-              />
+              <div className="flex items-center space-x-2">
+                <Input
+                  value={editedMessage}
+                  onChange={(e) => setEditedMessage(e.target.value)}
+                  onKeyPress={handleKeyPress}
+                  className="bg-white/10 border-none text-foreground focus:outline-none focus:ring-2 focus:ring-gray-400 rounded-lg"
+                  aria-label="Edit message"
+                />
+                <Button
+                  onClick={() => handleEditMessage(msg.id, editedMessage)}
+                  className="bg-purple-600 hover:bg-purple-700 text-white rounded-full h-8 w-8"
+                  aria-label="Send edited message"
+                >
+                  <Send className="h-4 w-4" />
+                </Button>
+              </div>
             ) : (
               <p>{msg.message}</p>
             )}
-            <div className="flex space-x-2 mt-2">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => handleCopyText(msg.message)}
-                className="text-white hover:text-gray-200 h-6 w-6"
-                title="Copy Message"
-                aria-label="Copy Message"
-              >
-                <Copy className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => handleEditMessage(msg.id, msg.message)}
-                className="text-white hover:text-gray-200 h-6 w-6"
-                title={editingMessageId === msg.id ? "Save Edit" : "Edit Message"}
-                aria-label={editingMessageId === msg.id ? "Save Edit" : "Edit Message"}
-              >
-                <Edit className="h-4 w-4" />
-              </Button>
-            </div>
-            <p className="text-xs text-gray-200 mt-2 opacity-70">{formatISTDateTime(msg.timestamp)}</p>
+            {selectedMessageId === msg.id && !editingMessageId && (
+              <div className="flex space-x-2 mt-2">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => handleCopyText(msg.message)}
+                  className="text-foreground hover:text-gray-500 h-6 w-6"
+                  title="Copy Message"
+                  aria-label="Copy Message"
+                >
+                  <Copy className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => handleEditMessage(msg.id, msg.message)}
+                  className="text-foreground hover:text-gray-500 h-6 w-6"
+                  title="Edit Message"
+                  aria-label="Edit Message"
+                >
+                  <Edit className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
+            <p className="text-xs text-muted-foreground mt-2 opacity-70">{formatISTDateTime(msg.timestamp)}</p>
           </div>
           <Avatar className="w-8 h-8 mt-1 flex-shrink-0">
             <AvatarImage src={userProfile?.photoURL || user?.photoURL || ""} />
@@ -734,6 +991,16 @@ export default function ChatPage() {
                 <Button
                   variant="ghost"
                   size="icon"
+                  onClick={() => handleSpeakResponse(msg.response)}
+                  className={`text-muted-foreground hover:text-foreground h-6 w-6 ${isSpeaking ? "animate-pulse bg-blue-500/20" : ""}`}
+                  title={isSpeaking ? "Stop Speaking" : "Speak Response"}
+                  aria-label={isSpeaking ? "Stop Speaking" : "Speak Response"}
+                >
+                  <Volume2 className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
                   onClick={() => handleFeedback(msg.id, true)}
                   className="text-muted-foreground hover:text-green-500 h-6 w-6"
                   title="Thumbs Up"
@@ -750,7 +1017,17 @@ export default function ChatPage() {
                   aria-label="Thumbs Down"
                 >
                   <ThumbsDown className="h-4 w-4" />
-              </Button>
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => handleRetryResponse(msg.id, msg.message)}
+                  className="text-muted-foreground hover:text-blue-500 h-6 w-6"
+                  title="Retry Response"
+                  aria-label="Retry Response"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                </Button>
               </div>
               <p className="text-xs text-muted-foreground mt-2 opacity-70">{formatISTDateTime(msg.timestamp)}</p>
             </div>
@@ -796,9 +1073,7 @@ export default function ChatPage() {
               >
                 <Menu className="h-5 w-5" />
               </Button>
-              <h1 className="text-xl font-bold text-foreground">
-                {currentSession ? currentSession.title : "Your Personalized Medibot"}
-              </h1>
+              <h1 className="text-xl font-bold text-foreground">MediBot - Your Health Assistant</h1>
             </div>
             <div className="flex items-center space-x-2">
               {user ? (
@@ -863,15 +1138,15 @@ export default function ChatPage() {
                   <div className="w-full max-w-md text-center space-y-8">
                     <div className="flex flex-col items-center space-y-6">
                       <div className="w-20 h-20 relative">
-                        <Image src="/logo.png" alt="Medibot Logo" width={80} height={80} className="rounded-full" />
+                        <Image src="/logo.png" alt="MediBot Logo" width={80} height={80} className="rounded-full" />
                       </div>
                       <div>
-                        <h1 className="text-3xl font-bold text-foreground">Welcome to Medibot</h1>
+                        <h1 className="text-3xl font-bold text-foreground">Welcome to MediBot</h1>
                         <p className="text-muted-foreground text-sm">Please log in or sign up to start chatting.</p>
                       </div>
                     </div>
                     <div className="space-y-4">
-                      <Link href="/auth/signin" className="block">
+                      <Link href="/auth/signin">
                         <Button
                           variant="outline"
                           className="w-full h-12 bg-muted border-border text-foreground hover:bg-purple-600 hover:text-white rounded-xl"
@@ -879,7 +1154,7 @@ export default function ChatPage() {
                           Login
                         </Button>
                       </Link>
-                      <Link href="/auth/signup" className="block">
+                      <Link href="/auth/signup">
                         <Button
                           variant="outline"
                           className="w-full h-12 bg-muted border-border text-foreground hover:bg-purple-600 hover:text-white rounded-xl"
@@ -895,10 +1170,10 @@ export default function ChatPage() {
                   <div className="w-full max-w-md text-center space-y-8">
                     <div className="flex flex-col items-center space-y-6">
                       <div className="w-20 h-20 relative">
-                        <Image src="/logo.png" alt="Medibot Logo" width={80} height={80} className="rounded-full" />
+                        <Image src="/logo.png" alt="MediBot Logo" width={80} height={80} className="rounded-full" />
                       </div>
                       <div>
-                        <h1 className="text-3xl font-bold text-foreground">Welcome to Medibot</h1>
+                        <h1 className="text-3xl font-bold text-foreground">Welcome to MediBot</h1>
                         <p className="text-muted-foreground text-sm">Start a conversation below.</p>
                       </div>
                     </div>
@@ -923,17 +1198,27 @@ export default function ChatPage() {
                         onChange={(e) => setMessage(e.target.value)}
                         onKeyPress={handleKeyPress}
                         placeholder="Ask a health question or upload an image..."
-                        className="bg-white dark:bg-gray-800 border border-border text-foreground placeholder-muted-foreground h-12 rounded-2xl px-4 text-sm focus:outline-none focus:ring-2 focus:ring-purple-600 shadow-sm transition-all"
-                        disabled={loading}
+                        className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-foreground placeholder-gray-400 dark:placeholder-gray-500 h-12 rounded-lg px-4 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm transition-all"
+                        disabled={loading || isRecording}
                         maxLength={1000}
                         aria-label="Chat message input"
                       />
                       <div className="absolute right-3 top-1/2 transform -translate-y-1/2 flex items-center space-x-2">
                         <Button
+                          onClick={handleToggleRecording}
+                          variant="ghost"
+                          size="icon"
+                          className={`bg-purple-600 hover:bg-purple-700 text-white h-8 w-8 rounded-full ${isRecording ? "animate-pulse bg-red-600" : ""}`}
+                          title={isRecording ? "Stop Recording" : "Record Voice"}
+                          aria-label={isRecording ? "Stop Recording" : "Record Voice"}
+                        >
+                          <Mic className="h-5 w-5" />
+                        </Button>
+                        <Button
                           onClick={handleFileUpload}
                           variant="ghost"
                           size="icon"
-                          className="text-muted-foreground hover:text-foreground hover:bg-gray-200 dark:hover:bg-gray-700 h-8 w-8 rounded-full"
+                          className="bg-purple-600 hover:bg-purple-700 text-white h-8 w-8 rounded-full"
                           title="Upload Image"
                           aria-label="Upload Image"
                         >
@@ -947,10 +1232,10 @@ export default function ChatPage() {
                           className="hidden"
                         />
                         <Select value={selectedModel} onValueChange={setSelectedModel}>
-                          <SelectTrigger className="w-[130px] bg-white dark:bg-gray-800 border-border text-foreground text-sm h-8 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600 shadow-sm">
+                          <SelectTrigger className="w-[130px] bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-foreground text-sm h-8 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm">
                             <SelectValue placeholder="Model" />
                           </SelectTrigger>
-                          <SelectContent className="bg-card border-border text-foreground text-sm shadow-lg rounded-lg">
+                          <SelectContent className="bg-card border-gray-200 dark:border-gray-700 text-foreground text-sm shadow-lg rounded-lg">
                             <SelectItem value="gemini-1.5-flash-latest">Gemini 1.5 Flash</SelectItem>
                             <SelectItem value="gemini-1.5-pro-latest">gpt-4o</SelectItem>
                             <SelectItem value="grok">x-ai/grok-3-beta</SelectItem>
@@ -979,7 +1264,7 @@ export default function ChatPage() {
                         onClick={removeFile}
                         variant="ghost"
                         size="icon"
-                        className="text-muted-foreground hover:text-red-500 h-8 w-8 rounded-full"
+                        className="bg-purple-600 hover:bg-purple-700 text-white h-8 w-8 rounded-full"
                         title="Remove File"
                         aria-label="Remove File"
                       >
@@ -996,7 +1281,7 @@ export default function ChatPage() {
         {/* Prescription Analysis Dialog */}
         {user && (
           <Dialog open={prescriptionDialogOpen} onOpenChange={setPrescriptionDialogOpen}>
-            <DialogContent className="bg-card border-border text-foreground max-w-2xl mx-auto max-h-[80vh] overflow-y-auto rounded-2xl p-6 shadow-lg">
+            <DialogContent className="bg-card border-gray-200 dark:border-gray-700 text-foreground max-w-2xl mx-auto max-h-[80vh] overflow-y-auto rounded-2xl p-6 shadow-lg">
               <DialogHeader>
                 <DialogTitle className="flex items-center space-x-2 text-lg">
                   <Camera className="h-5 w-5 text-muted-foreground" />
@@ -1008,7 +1293,7 @@ export default function ChatPage() {
                   <p className="text-muted-foreground text-sm">
                     Upload a photo of your prescription for AI-powered analysis and information.
                   </p>
-                  <div className="border-2 border-dashed border-border rounded-2xl p-8 text-center">
+                  <div className="border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-2xl p-8 text-center">
                     {analyzingPrescription ? (
                       <div className="space-y-4">
                         <div className="w-12 h-12 border-4 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
@@ -1059,7 +1344,7 @@ export default function ChatPage() {
                 </div>
               ) : (
                 <div className="space-y-6">
-                  <Card className="bg-card border-border rounded-2xl shadow-lg">
+                  <Card className="bg-card border-gray-200 dark:border-gray-700 rounded-2xl shadow-lg">
                     <CardHeader>
                       <CardTitle className="flex items-center space-x-2 text-lg">
                         <FileText className="h-5 w-5 text-muted-foreground" />
@@ -1125,7 +1410,7 @@ export default function ChatPage() {
                         setPrescriptionDialogOpen(false);
                       }}
                       variant="outline"
-                      className="flex-1 bg-muted border-border text-foreground hover:bg-purple-600 hover:text-white text-sm rounded-lg"
+                      className="flex-1 bg-muted border-gray-200 dark:border-gray-700 text-foreground hover:bg-purple-600 hover:text-white text-sm rounded-lg"
                     >
                       Close
                     </Button>
@@ -1145,7 +1430,7 @@ export default function ChatPage() {
         {/* History Dialog */}
         {user && (
           <Dialog open={historyDialogOpen} onOpenChange={setHistoryDialogOpen}>
-            <DialogContent className="bg-card border-border text-foreground max-w-md mx-auto p-6 rounded-2xl shadow-lg">
+            <DialogContent className="bg-card border-gray-200 dark:border-gray-700 text-foreground max-w-md mx-auto p-6 rounded-2xl shadow-lg">
               <DialogHeader>
                 <DialogTitle className="flex items-center space-x-2 text-lg">
                   <RotateCcw className="h-5 w-5 text-muted-foreground" />
@@ -1157,7 +1442,7 @@ export default function ChatPage() {
                   chatSessions.slice(0, 10).map((session) => (
                     <div
                       key={session.id}
-                      className={`p-4 rounded-xl border border-border cursor-pointer transition-colors ${
+                      className={`p-4 rounded-xl border border-gray-200 dark:border-gray-700 cursor-pointer transition-colors ${
                         currentSession?.id === session.id
                           ? "bg-purple-600/20 border-purple-600"
                           : "bg-muted hover:bg-purple-600/10"
@@ -1191,11 +1476,11 @@ export default function ChatPage() {
                   </div>
                 )}
               </div>
-              <div className="flex justify-end pt-4 border-t border-border">
+              <div className="flex justify-end pt-4 border-t border-gray-200 dark:border-gray-700">
                 <Link href="/history">
                   <Button
                     variant="outline"
-                    className="bg-muted border-border text-foreground hover:bg-purple-600 hover:text-white text-sm rounded-lg"
+                    className="bg-muted border-gray-200 dark:border-gray-700 text-foreground hover:bg-purple-600 hover:text-white text-sm rounded-lg"
                     onClick={() => setHistoryDialogOpen(false)}
                   >
                     View Full History

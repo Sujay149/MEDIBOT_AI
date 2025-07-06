@@ -1,3 +1,4 @@
+
 import {
   collection,
   doc,
@@ -17,6 +18,7 @@ import {
 } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { db, storage } from "./firebase";
+import { v4 as uuidv4 } from "uuid";
 
 export interface UserProfile {
   uid: string;
@@ -48,9 +50,9 @@ export interface UserProfile {
 }
 
 export interface ChatMessage {
-  id?: string;
+  id: string;
   userId: string;
-  image?: string;
+  image?: string | null;
   message: string;
   response: string;
   timestamp: Timestamp | Date;
@@ -249,6 +251,7 @@ export const addMessageToSession = async (
   message: string,
   response: string,
   type: "chat" | "summarizer" = "chat",
+  image: string | null = null
 ) => {
   try {
     const sessionRef = doc(db, "chatSessions", sessionId);
@@ -259,21 +262,34 @@ export const addMessageToSession = async (
     }
 
     const newMessage: ChatMessage = {
-      id: `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+      id: uuidv4(),
       userId,
-      message: message.slice(0, 1000),
-      response: response.slice(0, 2000),
-      type,
+      message: message.slice(0, 1000) || "No message provided",
+      response: response.slice(0, 2000) || "No response provided",
+      type: type || "chat",
       timestamp: new Date(),
+      image: image ?? null,
     };
 
+    console.log("addMessageToSession: newMessage before cleaning:", newMessage);
+
+    const cleanedMessage = Object.fromEntries(
+      Object.entries(newMessage).filter(([_, value]) => value !== undefined)
+    ) as ChatMessage;
+
+    console.log("addMessageToSession: cleanedMessage:", cleanedMessage);
+
+    if (!cleanedMessage.id || !cleanedMessage.userId || !cleanedMessage.message || !cleanedMessage.response || !cleanedMessage.type) {
+      throw new Error("Missing required fields in message");
+    }
+
     await updateDoc(sessionRef, {
-      messages: arrayUnion(newMessage),
+      messages: arrayUnion(cleanedMessage),
       updatedAt: serverTimestamp(),
     });
 
-    console.log("Added message to session:", sessionId, newMessage);
-    return newMessage;
+    console.log("Added message to session:", sessionId, cleanedMessage);
+    return cleanedMessage;
   } catch (error) {
     console.error("Error adding message to session:", error);
     throw new Error("Failed to add message");

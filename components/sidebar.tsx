@@ -1,4 +1,3 @@
-
 "use client";
 
 import Link from "next/link";
@@ -197,7 +196,6 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
                     <Avatar className="w-12 h-12" key={userProfile?.photoURL || "default"}>
                       <AvatarImage
                         src={userProfile?.photoURL || user?.photoURL || ""}
-
                       />
                       <AvatarFallback className="bg-purple-600 text-white font-semibold">
                         {userProfile?.displayName?.charAt(0).toUpperCase() ||
@@ -224,26 +222,22 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
                 {menuItems.map((item) => {
                   const isActive = pathname === item.href;
                   return (
-                    <Link key={item.href} href={item.href} legacyBehavior>
-                      <a>
-                        <Button
-                          variant="ghost"
-                          className={cn(
-                            "w-full justify-start text-left h-12 rounded-xl transition-all duration-200",
-                            "flex items-center font-sans",
-                            isActive
-                              ? "bg-purple-600 text-white shadow"
-                              : "text-muted-foreground hover:text-foreground hover:bg-muted",
-                            collapsed ? "justify-center" : "px-4"
-                          )}
-                          title={collapsed ? item.label : undefined}
-                        >
-                          <item.icon className="h-5 w-5 flex-shrink-0" />
-                          {!collapsed && (
-                            <span className="ml-3 font-medium">{item.label}</span>
-                          )}
-                        </Button>
-                      </a>
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      className={cn(
+                        "flex items-center font-sans h-12 rounded-xl transition-all duration-200",
+                        isActive
+                          ? "bg-purple-600 text-white shadow"
+                          : "text-muted-foreground hover:text-foreground hover:bg-muted",
+                        collapsed ? "justify-center" : "px-4"
+                      )}
+                      title={collapsed ? item.label : undefined}
+                    >
+                      <item.icon className="h-5 w-5 flex-shrink-0" />
+                      {!collapsed && (
+                        <span className="ml-3 font-medium">{item.label}</span>
+                      )}
                     </Link>
                   );
                 })}
