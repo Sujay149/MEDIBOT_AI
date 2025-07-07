@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -9,8 +8,8 @@ import { AuthGuard } from "@/components/auth-guard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -157,6 +156,21 @@ export default function ChatPage() {
     }
   }, []);
 
+  // Load Puter.js for text-based AI operations
+  useEffect(() => {
+    if (typeof window !== "undefined" && !window.puter) {
+      const script = document.createElement("script");
+      script.src = "https://js.puter.com/v2/";
+      script.async = true;
+      script.onload = () => console.log("Puter.js loaded successfully");
+      script.onerror = () => {
+        console.error("Failed to load Puter.js");
+        toast.error("Failed to load AI service. Text-based features may be affected.");
+      };
+      document.head.appendChild(script);
+    }
+  }, []);
+
   // Normalize Firestore Timestamp to Date
   const normalizeSession = (session: ChatSession): ProcessedChatSession => {
     return {
@@ -167,7 +181,7 @@ export default function ChatPage() {
         timestamp: msg.timestamp instanceof Date
           ? msg.timestamp
           : (msg.timestamp as firebase.Timestamp)?.toDate?.() || new Date(),
-        image: msg.image ?? null, // Ensure image is string or null
+        image: msg.image !== undefined && typeof msg.image === "string" && msg.image.startsWith("https://") ? msg.image : null,
       })),
       createdAt: session.createdAt instanceof Date
         ? session.createdAt
@@ -270,6 +284,11 @@ export default function ChatPage() {
 
   const uploadImageToCloudinary = async (file: File): Promise<string | null> => {
     try {
+      const validImageTypes = ["image/jpeg", "image/png", "image/heic"];
+      if (!validImageTypes.includes(file.type)) {
+        throw new Error(`Unsupported file type: ${file.type}. Please upload a JPG, PNG, or HEIC image.`);
+      }
+
       const formData = new FormData();
       formData.append("file", file);
       formData.append("upload_preset", "medibot_Uploads");
@@ -283,15 +302,27 @@ export default function ChatPage() {
       );
 
       if (!response.ok) {
-        throw new Error(`Cloudinary upload failed: ${response.statusText}`);
+        const errorText = await response.text();
+        throw new Error(`Cloudinary upload failed: ${response.status} - ${errorText}`);
       }
 
       const data = await response.json();
-      console.log("Uploaded image URL:", data.secure_url);
-      return data.secure_url || null;
-    } catch (error) {
-      console.error("Error uploading image to Cloudinary:", error);
-      toast.error("Failed to upload image");
+      const imageUrl = data.secure_url;
+      if (!imageUrl || typeof imageUrl !== "string" || !imageUrl.startsWith("https://")) {
+        console.warn("Invalid Cloudinary URL:", imageUrl);
+        return null;
+      }
+
+      console.log("Uploaded image URL:", imageUrl);
+      return imageUrl;
+    } catch (error: any) {
+      console.error("Error uploading image to Cloudinary:", {
+        message: error.message,
+        stack: error.stack,
+        fileType: file?.type,
+        fileName: file?.name,
+      });
+      toast.error(`Failed to upload image: ${error.message || "Unknown error"}`);
       return null;
     }
   };
@@ -338,7 +369,6 @@ export default function ChatPage() {
         imageUrl = await uploadImageToCloudinary(selectedFile);
       }
 
-      // Log inputs to addMessageToSession
       console.log("handleSendMessage: calling addMessageToSession with:", {
         sessionId,
         userId: user.uid,
@@ -380,7 +410,6 @@ export default function ChatPage() {
         botResponse = botResponse ? `${botResponse}\n\n**Image received**` : "**Image received**";
       }
 
-      // Log inputs again before final addMessageToSession call
       console.log("handleSendMessage: final addMessageToSession with:", {
         sessionId,
         userId: user.uid,
@@ -453,7 +482,6 @@ export default function ChatPage() {
           msg.id === messageId ? { ...msg, response: botResponse } : msg
         );
 
-        // Log inputs to addMessageToSession
         console.log("handleRetryResponse: calling addMessageToSession with:", {
           sessionId,
           userId: user.uid,
@@ -497,7 +525,6 @@ export default function ChatPage() {
             msg.id === messageId ? { ...msg, message: editedMessage, response: botResponse } : msg
           );
 
-          // Log inputs to addMessageToSession
           console.log("handleEditMessage: calling addMessageToSession with:", {
             sessionId,
             userId: user.uid,
@@ -652,146 +679,244 @@ export default function ChatPage() {
     }
   };
 
-  const generateAIResponse = async (userMessage: string, selectedModel: string): Promise<string> => {
-    try {
-      const modelMap: Record<string, string> = {
-        "gemini-1.5-flash-latest": "gemini-1.5-flash",
-        "gemini-1.5-pro-latest": "gpt-4o",
-        "grok": "x-ai/grok-3-beta",
-      };
+ const generateAIResponse = async (userMessage: string, selectedModel: string): Promise<string> => {
+  try {
+    const modelMap: Record<string, string> = {
+      "gemini-1.5-flash-latest": "gemini-1.5-flash",
+      "gemini-1.5-pro-latest": "gpt-4o",
+      "grok": "x-ai/grok-3-beta",
+    };
 
-      const resolvedModel = modelMap[selectedModel];
+    const resolvedModel = modelMap[selectedModel];
+    if (!resolvedModel) {
+      console.error("Unrecognized model:", selectedModel);
+      throw new Error(`Invalid model selected: ${selectedModel}`);
+    }
 
-      if (!resolvedModel) {
-        console.error("Unrecognized model:", selectedModel);
-        return "Model not recognized. Please select a valid model.";
+    const prompt = `You are MediBot, a health-focused AI assistant. Provide a concise, informative, and professional response to the following user query. Ensure the response is educational, not a substitute for professional medical advice, and includes a reminder to consult a healthcare professional for personalized advice. Query: ${userMessage}`;
+
+    if (resolvedModel === "gemini-1.5-flash") {
+      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${resolvedModel}:generateContent?key=${process.env.NEXT_PUBLIC_GEMINI_API_KEY}`;
+      const response = await fetchWithRetry(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { temperature: 0.7, maxOutputTokens: 200 },
+        }),
+      });
+
+      const data = await response.json();
+      console.log("Gemini API response:", data);
+
+      if (!data?.candidates?.[0]?.content?.parts?.[0]?.text) {
+        console.error("Invalid or empty Gemini response:", data);
+        throw new Error("No valid response from Gemini API");
       }
 
-      const prompt = `You are MediBot, a health-focused AI assistant. Provide a concise, informative, and professional response to the following user query. Ensure the response is educational, not a substitute for professional medical advice, and includes a reminder to consult a healthcare professional for personalized advice. Query: ${userMessage}`;
+      return data.candidates[0].content.parts[0].text.trim();
+    }
 
-      if (resolvedModel === "gemini-1.5-flash") {
-        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${resolvedModel}:generateContent`;
-        const response = await fetch(`${endpoint}?key=${process.env.NEXT_PUBLIC_GEMINI_API_KEY}`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: { temperature: 0.7, maxOutputTokens: 200 },
-          }),
-        });
-
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        const data = await response.json();
-        return data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "No response generated.";
-      }
-
-      if (typeof window !== "undefined" && !window.puter) {
+    // Load Puter.js if not already loaded
+    if (typeof window !== "undefined" && !window.puter) {
+      try {
         await new Promise<void>((resolve, reject) => {
           const script = document.createElement("script");
           script.src = "https://js.puter.com/v2/";
-          script.onload = () => resolve();
-          script.onerror = () => reject(new Error("Failed to load Puter.js"));
+          script.onload = () => {
+            console.log("Puter.js loaded successfully");
+            resolve();
+          };
+          script.onerror = () => {
+            console.error("Failed to load Puter.js");
+            reject(new Error("Failed to load Puter.js"));
+          };
           document.head.appendChild(script);
         });
+      } catch (error) {
+        console.error("Puter.js load error:", error);
+        throw new Error("Failed to load AI service. Please try again.");
+      }
+    }
+
+    // Attempt Puter.js AI chat
+    try {
+      const response = await window.puter.ai.chat(prompt, { model: resolvedModel });
+      if (!response?.message?.content) {
+        console.error("Invalid or empty Puter.js response:", response);
+        throw new Error("No valid response from AI service");
+      }
+      return response.message.content.trim();
+    } catch (puterError) {
+      console.error("Puter.js chat error:", puterError);
+      // Fallback to Gemini if Puter.js fails
+      console.warn("Falling back to Gemini API due to Puter.js failure");
+      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.NEXT_PUBLIC_GEMINI_API_KEY}`;
+      const response = await fetchWithRetry(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { temperature: 0.7, maxOutputTokens: 200 },
+        }),
+      });
+
+      const data = await response.json();
+      console.log("Gemini fallback response:", data);
+
+      if (!data?.candidates?.[0]?.content?.parts?.[0]?.text) {
+        console.error("Invalid or empty Gemini fallback response:", data);
+        throw new Error("No valid response from fallback Gemini API");
       }
 
-      const response = await window.puter.ai.chat(prompt, { model: resolvedModel });
-      return response?.message?.content?.trim() || "No response generated.";
-    } catch (error) {
-      console.error("Error generating AI response:", error);
-      return "I'm sorry, I couldn't process your request right now. Please try again.";
+      return data.candidates[0].content.parts[0].text.trim();
     }
+  } catch (error: any) {
+    console.error("Error generating AI response:", {
+      message: error.message || "Unknown error",
+      stack: error.stack,
+      selectedModel,
+      userMessage: userMessage.substring(0, 50) + (userMessage.length > 50 ? "..." : ""),
+    });
+    throw new Error(`Failed to generate response: ${error.message || "Unknown error"}`);
+  }
+};
+
+  const fetchWithRetry = async (url: string, options: RequestInit, retries = 3, backoff = 3000): Promise<Response> => {
+    for (let i = 0; i < retries; i++) {
+      try {
+        const response = await fetch(url, options);
+        if (response.status === 429) {
+          const retryDelay = backoff * Math.pow(2, i);
+          console.warn(`Rate limit hit, retrying in ${retryDelay / 1000}s (attempt ${i + 1}/${retries})`);
+          await new Promise((resolve) => setTimeout(resolve, retryDelay));
+          continue;
+        }
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`HTTP error: ${response.status} - ${errorText}`);
+        }
+        return response;
+      } catch (error) {
+        if (i === retries - 1) throw error;
+      }
+    }
+    throw new Error("Max retries reached");
   };
 
   const analyzePrescription = async (file: File, selectedModel: string): Promise<PrescriptionAnalysis> => {
     try {
+      // Validate file type and size
+      const validImageTypes = ["image/jpeg", "image/png", "image/heic"];
+      if (!validImageTypes.includes(file.type)) {
+        throw new Error(`Unsupported file type: ${file.type}. Please upload a JPG, PNG, or HEIC image.`);
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        throw new Error("File size exceeds 5MB limit. Please upload a smaller image.");
+      }
+
+      // Convert file to base64
       const base64Data = await fileToBase64(file);
-      const prompt = `Analyze this prescription image and extract medications, dosages, instructions, and any warnings. Return the response in JSON format with fields: medications (array), dosages (array), instructions (string), warnings (array).`;
-      const fullPrompt = `${prompt}\n\nHere is the image in base64:\ndata:${file.type};base64,${base64Data}`;
+      if (!base64Data) {
+        throw new Error("Failed to convert file to base64.");
+      }
 
-      const isGeminiModel = selectedModel.startsWith("gemini");
+      console.log("File details:", {
+        fileName: file.name,
+        fileType: file.type,
+        fileSize: `${(file.size / 1024 / 1024).toFixed(2)} MB`,
+        base64Length: base64Data.length,
+      });
 
-      if (isGeminiModel) {
-        const response = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:generateContent?key=${process.env.NEXT_PUBLIC_GEMINI_API_KEY}`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              contents: [
-                {
-                  parts: [
-                    { text: prompt },
-                    { inlineData: { mimeType: file.type, data: base64Data } },
-                  ],
-                },
+      // Warn if non-Gemini model is selected
+      if (selectedModel !== "gemini-1.5-flash-latest") {
+        console.warn(`Selected model ${selectedModel} is not optimized for image analysis. Using Gemini 1.5 Flash.`);
+      }
+
+      const prompt = `You are MediBot, a health-focused AI assistant. Analyze the provided prescription image and extract the following details in JSON format:
+      {
+        "medications": string[], // List of medication names
+        "dosages": string[], // List of dosages (e.g., "500 mg", "1 tablet")
+        "instructions": string, // Administration instructions
+        "warnings": string[] // Any warnings or precautions
+      }
+      Ensure the response is accurate, concise, and includes a reminder that this analysis is for educational purposes only and users should consult a healthcare professional. The prescription image is provided as base64 data below.
+      
+      Image data: data:${file.type};base64,${base64Data}`;
+
+      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.NEXT_PUBLIC_GEMINI_API_KEY}`;
+      const response = await fetchWithRetry(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [
+                { text: prompt },
+                { inlineData: { mimeType: file.type, data: base64Data } },
               ],
-              generationConfig: { temperature: 0.5, maxOutputTokens: 500 },
-            }),
-          }
-        );
+            },
+          ],
+          generationConfig: { temperature: 0.5, maxOutputTokens: 500 },
+        }),
+      });
 
-        if (!response.ok) {
-          throw new Error(`Gemini HTTP error! status: ${response.status}`);
-        }
+      const data = await response.json();
+      let responseText = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "{}";
+      console.log("Gemini raw response:", responseText);
 
-        const data = await response.json();
-        let responseText = data?.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
-        responseText = responseText.replace(/```json|```|`/g, "").trim();
-
-        let result;
-        try {
-          result = JSON.parse(responseText);
-        } catch (parseError) {
-          console.error("Gemini JSON parse error:", parseError, responseText);
-          throw new Error("Invalid JSON from Gemini");
-        }
-
-        return {
-          medications: result.medications || ["Unknown"],
-          dosages: result.dosages || ["Unknown"],
-          instructions: result.instructions || "No instructions provided.",
-          warnings: result.warnings || [],
-        };
-      }
-
-      if (typeof window !== "undefined" && !window.puter) {
-        await new Promise<void>((resolve, reject) => {
-          const script = document.createElement("script");
-          script.src = "https://js.puter.com/v2/";
-          script.onload = () => resolve();
-          script.onerror = () => reject(new Error("Failed to load Puter.js"));
-          document.head.appendChild(script);
-        });
-      }
-
-      const response = await window.puter.ai.chat(fullPrompt, { model: selectedModel });
-      let responseText = response?.message?.content || "{}";
+      // Clean up response (remove code fences if present)
       responseText = responseText.replace(/```json|```|`/g, "").trim();
 
-      let result;
+      // Parse JSON response
+      let result: PrescriptionAnalysis;
       try {
         result = JSON.parse(responseText);
       } catch (parseError) {
-        console.error("Puter.js JSON parse error:", parseError, responseText);
-        throw new Error("Invalid JSON from Grok/OpenAI");
+        console.error("JSON parse error:", parseError, "Response text:", responseText);
+        throw new Error("Invalid JSON response from Gemini API");
+      }
+
+      // Validate response structure
+      if (
+        !result.medications ||
+        !Array.isArray(result.medications) ||
+        !result.dosages ||
+        !Array.isArray(result.dosages) ||
+        !result.instructions ||
+        typeof result.instructions !== "string" ||
+        !result.warnings ||
+        !Array.isArray(result.warnings)
+      ) {
+        console.warn("Incomplete Gemini response:", result);
+        return {
+          medications: ["Unknown"],
+          dosages: ["Unknown"],
+          instructions: "Incomplete analysis. Please try again.",
+          warnings: ["Analysis may be incomplete. Consult a healthcare professional."],
+        };
       }
 
       return {
-        medications: result.medications || ["Unknown"],
-        dosages: result.dosages || ["Unknown"],
-        instructions: result.instructions || "No instructions provided.",
-        warnings: result.warnings || [],
+        medications: result.medications,
+        dosages: result.dosages,
+        instructions: result.instructions,
+        warnings: [...result.warnings, "This analysis is for informational purposes only. Consult your doctor or pharmacist."],
       };
-    } catch (error) {
-      console.error("Error analyzing prescription:", error);
+    } catch (error: any) {
+      console.error("Error analyzing prescription:", {
+        message: error.message,
+        stack: error.stack,
+        selectedModel,
+        fileType: file?.type,
+        fileName: file?.name,
+        fileSize: file ? `${(file.size / 1024 / 1024).toFixed(2)} MB` : "N/A",
+      });
+      toast.error(`Failed to analyze prescription: ${error.message.includes("429") ? "API rate limit exceeded. Please try again later." : error.message || "Unknown error"}`);
       return {
         medications: ["Error"],
         dosages: ["N/A"],
-        instructions: "Failed to analyze prescription.",
+        instructions: "Failed to analyze prescription. Please try again.",
         warnings: ["Please try again or consult a healthcare professional."],
       };
     }
@@ -802,7 +927,11 @@ export default function ChatPage() {
       const reader = new FileReader();
       reader.onload = () => {
         const base64String = (reader.result as string).split(",")[1];
-        resolve(base64String);
+        if (!base64String) {
+          reject(new Error("Failed to convert file to base64"));
+        } else {
+          resolve(base64String);
+        }
       };
       reader.onerror = () => reject(new Error("Failed to read file"));
       reader.readAsDataURL(file);
@@ -874,6 +1003,10 @@ export default function ChatPage() {
     });
   };
 
+  const isValidImageUrl = (url: string | null | undefined): boolean => {
+    return !!url && typeof url === "string" && url.startsWith("https://");
+  };
+
   const renderMessages = () => {
     if (!user || !currentSession?.messages || currentSession.messages.length === 0) {
       return null;
@@ -902,17 +1035,20 @@ export default function ChatPage() {
           onClick={() => setSelectedMessageId(msg.id === selectedMessageId ? null : msg.id)}
         >
           <div className="bg-gray-200 dark:bg-gray-700 rounded-2xl p-4 text-foreground text-sm leading-relaxed shadow-md">
-            {msg.image && (
+            {isValidImageUrl(msg.image) ? (
               <div className="mb-2">
                 <Image
-                  src={msg.image}
+                  src={msg.image || ""}
                   alt="Uploaded image"
                   width={200}
                   height={200}
-                  className="rounded-lg object-cover"
+                  className="rounded-lg object-contain"
+                  onError={(e) => console.error(`Image failed to load: ${msg.image}`)}
                 />
               </div>
-            )}
+            ) : msg.image !== null ? (
+              <p className="text-xs text-red-500 mb-2">Invalid or missing image</p>
+            ) : null}
             {editingMessageId === msg.id ? (
               <div className="flex items-center space-x-2">
                 <Input
@@ -1237,8 +1373,8 @@ export default function ChatPage() {
                           </SelectTrigger>
                           <SelectContent className="bg-card border-gray-200 dark:border-gray-700 text-foreground text-sm shadow-lg rounded-lg">
                             <SelectItem value="gemini-1.5-flash-latest">Gemini 1.5 Flash</SelectItem>
-                            <SelectItem value="gemini-1.5-pro-latest">gpt-4o</SelectItem>
-                            <SelectItem value="grok">x-ai/grok-3-beta</SelectItem>
+                            <SelectItem value="gemini-1.5-pro-latest">GPT-4o</SelectItem>
+                            <SelectItem value="grok">Grok</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
@@ -1281,12 +1417,18 @@ export default function ChatPage() {
         {/* Prescription Analysis Dialog */}
         {user && (
           <Dialog open={prescriptionDialogOpen} onOpenChange={setPrescriptionDialogOpen}>
-            <DialogContent className="bg-card border-gray-200 dark:border-gray-700 text-foreground max-w-2xl mx-auto max-h-[80vh] overflow-y-auto rounded-2xl p-6 shadow-lg">
+            <DialogContent
+              className="bg-card border-gray-200 dark:border-gray-700 text-foreground max-w-2xl mx-auto max-h-[80vh] overflow-y-auto rounded-2xl p-6 shadow-lg"
+              aria-describedby="prescription-dialog-description"
+            >
               <DialogHeader>
                 <DialogTitle className="flex items-center space-x-2 text-lg">
                   <Camera className="h-5 w-5 text-muted-foreground" />
                   <span>Prescription Analysis</span>
                 </DialogTitle>
+                <DialogDescription id="prescription-dialog-description">
+                  Upload a photo of your prescription to analyze its contents.
+                </DialogDescription>
               </DialogHeader>
               {!analysisResult ? (
                 <div className="space-y-4">
@@ -1323,7 +1465,12 @@ export default function ChatPage() {
                         setAnalyzingPrescription(true);
                         analyzePrescription(file, selectedModel)
                           .then((analysis) => {
-                            setAnalysisResult(analysis);
+                            setAnalysisResult({
+                              ...analysis,
+                              userId: user.uid,
+                              fileName: file.name,
+                              createdAt: new Date(),
+                            });
                             toast.success("Prescription analyzed successfully!");
                           })
                           .catch((error) => {
@@ -1430,12 +1577,18 @@ export default function ChatPage() {
         {/* History Dialog */}
         {user && (
           <Dialog open={historyDialogOpen} onOpenChange={setHistoryDialogOpen}>
-            <DialogContent className="bg-card border-gray-200 dark:border-gray-700 text-foreground max-w-md mx-auto p-6 rounded-2xl shadow-lg">
+            <DialogContent
+              className="bg-card border-gray-200 dark:border-gray-700 text-foreground max-w-md mx-auto p-6 rounded-2xl shadow-lg"
+              aria-describedby="history-dialog-description"
+            >
               <DialogHeader>
                 <DialogTitle className="flex items-center space-x-2 text-lg">
                   <RotateCcw className="h-5 w-5 text-muted-foreground" />
                   <span>Recent Chats</span>
                 </DialogTitle>
+                <DialogDescription id="history-dialog-description">
+                  View your recent chat sessions.
+                </DialogDescription>
               </DialogHeader>
               <div className="space-y-4 overflow-y-auto max-h-96">
                 {chatSessions.length > 0 ? (
