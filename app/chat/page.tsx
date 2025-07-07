@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
 import { v4 as uuidv4 } from "uuid";
 import Image from "next/image";
 import { Sidebar } from "@/components/sidebar";
@@ -79,7 +79,9 @@ interface ProcessedChatSession extends Omit<ChatSession, "createdAt" | "updatedA
   }>;
 }
 
-export default function ChatPage() {
+
+
+function ChatContent() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [message, setMessage] = useState("");
   const [currentSession, setCurrentSession] = useState<ProcessedChatSession | null>(null);
@@ -246,7 +248,7 @@ export default function ChatPage() {
       console.log("Unsubscribing from chat sessions");
       unsubscribe?.();
     };
-  }, [user, searchParams]);
+  }, [user, searchParams, currentSession]);
 
   // Auto-scroll to the latest message
   useEffect(() => {
@@ -1645,5 +1647,13 @@ export default function ChatPage() {
         )}
       </div>
     </AuthGuard>
+  );
+}
+
+export default function ChatPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <ChatContent />
+    </Suspense>
   );
 }
