@@ -14,8 +14,23 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
-  ThumbsDown, ThumbsUp, Copy, Edit, Menu, Plus, Camera, RotateCcw, Upload,
-  Send, X, FileText, Pill, AlertCircle, Mic, Volume2, RefreshCw
+  ThumbsDown,
+  ThumbsUp,
+  Copy,
+  Edit,
+  Menu,
+  Plus,
+  Camera,
+  RotateCcw,
+  Upload,
+  Send,
+  X,
+  FileText,
+  Pill,
+  AlertCircle,
+  Mic,
+  Volume2,
+  RefreshCw,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import {
@@ -25,14 +40,13 @@ import {
   updateChatSessionTitle,
   subscribeToUserChatSessions,
   type ChatSession,
-  type ChatMessage
+  type ChatMessage,
 } from "@/lib/firestore";
 import { toast } from "sonner";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import firebase from "firebase/firestore";
 
-// Global declarations
 declare global {
   interface Window {
     puter: any;
@@ -65,7 +79,7 @@ interface ProcessedChatSession extends Omit<ChatSession, "createdAt" | "updatedA
   }>;
 }
 
-export default function ChatContent() {
+export default function ChatPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [message, setMessage] = useState("");
   const [currentSession, setCurrentSession] = useState<ProcessedChatSession | null>(null);
@@ -83,18 +97,9 @@ export default function ChatContent() {
   const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
-
   const { user, userProfile } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
-
-  // Optional: use searchParams (e.g., pre-fill message or trigger logic)
-  useEffect(() => {
-    const initialMessage = searchParams?.get("message") || "";
-    if (initialMessage) {
-      setMessage(initialMessage);
-    }
-  }, [searchParams]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
