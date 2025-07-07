@@ -66,6 +66,7 @@ export default function HistoryPage() {
       ...session,
       messages: (session.messages || []).map((msg) => ({
         ...msg,
+        image: msg.image ?? undefined,
         timestamp: msg.timestamp instanceof Date
           ? msg.timestamp
           : (msg.timestamp as any)?.toDate?.() || new Date(),
