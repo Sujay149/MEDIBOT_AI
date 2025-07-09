@@ -5,21 +5,11 @@ import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { MapPin, Search } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
-import {
-  addAppointment,
-  updateAppointment,
-  type Appointment,
-} from "@/lib/firestore";
+import { addAppointment, updateAppointment, type Appointment } from "@/lib/firestore";
 import { toast } from "sonner";
 import axios from "axios";
 
@@ -34,23 +24,19 @@ interface HospitalLocation {
   lng: number;
 }
 
-export function AppointmentForm({
-  appointment,
-  onSuccess,
-  onCancel,
-}: AppointmentFormProps) {
+export function AppointmentForm({ appointment, onSuccess, onCancel }: AppointmentFormProps) {
   const [formData, setFormData] = useState({
     hospitalName: "",
     hospitalAddress: "",
     hospitalPhone: "",
     doctorName: "",
+    doctorPhone: "",
     appointmentType: "",
     date: "",
     time: "",
     notes: "",
   });
-  const [hospitalLocation, setHospitalLocation] =
-    useState<HospitalLocation | undefined>();
+  const [hospitalLocation, setHospitalLocation] = useState<HospitalLocation | null>(null);
   const [loading, setLoading] = useState(false);
   const [searchingLocation, setSearchingLocation] = useState(false);
   const { user } = useAuth();
@@ -65,6 +51,7 @@ export function AppointmentForm({
         hospitalAddress: appointment.hospitalAddress,
         hospitalPhone: appointment.hospitalPhone || "",
         doctorName: appointment.doctorName,
+        doctorPhone: appointment.doctorPhone || "",
         appointmentType: appointment.appointmentType,
         date: appointment.date,
         time: appointment.time,
@@ -158,9 +145,7 @@ export function AppointmentForm({
 
             toast.success("Hospital location found!");
           } else {
-            toast.error(
-              "Could not find hospital location. Please check the name and try again."
-            );
+            toast.error("Could not find hospital location. Please check the name and try again.");
           }
           setSearchingLocation(false);
         });
@@ -175,13 +160,16 @@ export function AppointmentForm({
   const sendWhatsappMessage = async (to: string, text: string) => {
     try {
       await axios.post(
-        "/api/send-whatsapp",
+        `https://graph.facebook.com/v19.0/YOUR_PHONE_NUMBER_ID/messages`,
         {
+          messaging_product: "whatsapp",
           to,
-          message: text,
+          type: "text",
+          text: { body: text },
         },
         {
           headers: {
+            Authorization: `Bearer YOUR_WABA_TOKEN`,
             "Content-Type": "application/json",
           },
         }
@@ -195,14 +183,11 @@ export function AppointmentForm({
     e.preventDefault();
     if (!user) return;
 
-    if (!formData.hospitalName.trim())
-      return toast.error("Hospital name is required");
-    if (!formData.hospitalAddress.trim())
-      return toast.error("Hospital address is required");
-    if (!formData.doctorName.trim())
-      return toast.error("Doctor name is required");
-    if (!formData.appointmentType)
-      return toast.error("Appointment type is required");
+    if (!formData.hospitalName.trim()) return toast.error("Hospital name is required");
+    if (!formData.hospitalAddress.trim()) return toast.error("Hospital address is required");
+    if (!formData.doctorName.trim()) return toast.error("Doctor name is required");
+   
+    if (!formData.appointmentType) return toast.error("Appointment type is required");
     if (!formData.date) return toast.error("Date is required");
     if (!formData.time) return toast.error("Time is required");
 
@@ -214,32 +199,28 @@ export function AppointmentForm({
         hospitalAddress: formData.hospitalAddress.trim(),
         hospitalPhone: formData.hospitalPhone.trim(),
         doctorName: formData.doctorName.trim(),
+        doctorPhone: formData.doctorPhone.trim(),
         appointmentType: formData.appointmentType,
         date: formData.date,
         time: formData.time,
         notes: formData.notes.trim(),
         hospitalLocation,
-       patientPhone: user.phoneNumber || "",
-
+        patientPhone: user.phoneNumber,
         userName: user.displayName || "",
       };
 
       if (appointment && appointment.id) {
-        await updateAppointment(appointment.id, appointmentData);
+        await updateAppointment(appointment.id, { ...appointmentData });
         toast.success("Appointment updated successfully!");
       } else {
-        await addAppointment(user.uid, {
-          ...appointmentData,
-          status: "scheduled",
-        });
+        await addAppointment(user.uid, { ...appointmentData, status: "scheduled" });
         toast.success("Appointment booked successfully!");
       }
 
-    await sendWhatsappMessage(
-  `+91${formData.hospitalPhone}`,
-  `📋 New Appointment Request:\n👤 Patient: ${user.displayName}\n🏥 Hospital: ${formData.hospitalName}\n📅 Date: ${formData.date} at ${formData.time}\n📄 Notes: ${formData.notes || "None"}\n\nReply with *ACCEPT* or *REJECT*.`
-);
-
+      await sendWhatsappMessage(
+        `+91${formData.doctorPhone}`,
+        `📋 New Appointment:\nDoctor: ${formData.doctorName}\nDate: ${formData.date} at ${formData.time}\nHospital: ${formData.hospitalName}\nNotes: ${formData.notes}`
+      );
 
       onSuccess();
     } catch (error) {
@@ -295,7 +276,8 @@ export function AppointmentForm({
           <Input id="doctorName" value={formData.doctorName} onChange={(e) => setFormData({ ...formData, doctorName: e.target.value })} required />
         </div>
 
-      
+     
+
         <div>
           <Label htmlFor="appointmentType">Appointment Type *</Label>
           <Select value={formData.appointmentType} onValueChange={(value) => setFormData({ ...formData, appointmentType: value })}>
