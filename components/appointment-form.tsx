@@ -30,7 +30,7 @@ export function AppointmentForm({ appointment, onSuccess, onCancel }: Appointmen
     hospitalAddress: "",
     hospitalPhone: "",
     doctorName: "",
-    doctorPhone: "",
+    
     appointmentType: "",
     date: "",
     time: "",
@@ -51,7 +51,7 @@ export function AppointmentForm({ appointment, onSuccess, onCancel }: Appointmen
         hospitalAddress: appointment.hospitalAddress,
         hospitalPhone: appointment.hospitalPhone || "",
         doctorName: appointment.doctorName,
-        doctorPhone: appointment.doctorPhone || "",
+     
         appointmentType: appointment.appointmentType,
         date: appointment.date,
         time: appointment.time,
@@ -199,7 +199,7 @@ export function AppointmentForm({ appointment, onSuccess, onCancel }: Appointmen
         hospitalAddress: formData.hospitalAddress.trim(),
         hospitalPhone: formData.hospitalPhone.trim(),
         doctorName: formData.doctorName.trim(),
-        doctorPhone: formData.doctorPhone.trim(),
+    
         appointmentType: formData.appointmentType,
         date: formData.date,
         time: formData.time,
@@ -217,10 +217,7 @@ export function AppointmentForm({ appointment, onSuccess, onCancel }: Appointmen
         toast.success("Appointment booked successfully!");
       }
 
-      await sendWhatsappMessage(
-        `+91${formData.doctorPhone}`,
-        `📋 New Appointment:\nDoctor: ${formData.doctorName}\nDate: ${formData.date} at ${formData.time}\nHospital: ${formData.hospitalName}\nNotes: ${formData.notes}`
-      );
+     
 
       onSuccess();
     } catch (error) {
