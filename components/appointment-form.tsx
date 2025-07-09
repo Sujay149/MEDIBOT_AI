@@ -63,18 +63,31 @@ export function AppointmentForm({ appointment, onSuccess, onCancel }: Appointmen
     }
   }, [appointment]);
 
-  useEffect(() => {
-    if (!window.google) {
+ useEffect(() => {
+  const initialize = () => {
+    if (window.google && window.google.maps && mapRef.current) {
+      initializeMap(); // your custom function
+    }
+  };
+
+  if (typeof window !== "undefined") {
+    if (window.google && window.google.maps) {
+      initialize(); // Already loaded
+    } else if (!document.querySelector("#google-maps-script")) {
       const script = document.createElement("script");
-      script.src = `https://maps.googleapis.com/maps/api/js?key=YOUR_GOOGLE_MAPS_API_KEY&libraries=places`;
+      script.id = "google-maps-script";
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&libraries=places`;
       script.async = true;
       script.defer = true;
-      script.onload = initializeMap;
+      script.onload = initialize;
+      script.onerror = () => {
+        toast.error("Failed to load Google Maps script.");
+      };
       document.head.appendChild(script);
-    } else {
-      initializeMap();
     }
-  }, []);
+  }
+}, []);
+
 
   useEffect(() => {
     if (hospitalLocation && mapInstanceRef.current) {
