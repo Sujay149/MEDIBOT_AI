@@ -220,9 +220,10 @@ export default function AppointmentsPage() {
                                 <div className="flex justify-between items-start">
                                   <div className="flex-1">
                                     <div className="flex items-center space-x-1 mb-1">
-                                      <h3 className="font-medium text-sm line-clamp-1">
-                                        {appointment.hospitalName}
-                                      </h3>
+                                   <h3 className="font-medium text-sm line-clamp-1 text-gray-900 dark:text-gray-100">
+  {appointment.hospitalName}
+</h3>
+
                                       <Badge className={`${color} text-white text-xs px-1.5 py-0.5`}>
                                         {status === "upcoming" ? "Soon" : "Scheduled"}
                                       </Badge>
@@ -302,7 +303,10 @@ export default function AppointmentsPage() {
                               <div className="flex justify-between items-center">
                                 <div className="truncate">
                                   <div className="flex items-center space-x-1">
-                                    <h3 className="font-medium text-sm truncate">{appointment.hospitalName}</h3>
+                                    <h3 className="font-medium text-sm truncate text-gray-900 dark:text-gray-100">
+  {appointment.hospitalName}
+</h3>
+
                                     <Badge className="bg-green-600 text-white text-xs px-1.5 py-0.5">
                                       Done
                                     </Badge>
