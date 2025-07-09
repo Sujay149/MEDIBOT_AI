@@ -5,18 +5,23 @@ import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { MapPin, Search } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
-import { addAppointment, updateAppointment, type Appointment } from "@/lib/firestore";
+import {
+  addAppointment,
+  updateAppointment,
+  type Appointment,
+} from "@/lib/firestore";
 import { toast } from "sonner";
-
-declare global {
-  interface Window {
-    initMap: () => void;
-  }
-}
+import axios from "axios";
 
 interface AppointmentFormProps {
   appointment?: Appointment | null;
@@ -29,7 +34,11 @@ interface HospitalLocation {
   lng: number;
 }
 
-export function AppointmentForm({ appointment, onSuccess, onCancel }: AppointmentFormProps) {
+export function AppointmentForm({
+  appointment,
+  onSuccess,
+  onCancel,
+}: AppointmentFormProps) {
   const [formData, setFormData] = useState({
     hospitalName: "",
     hospitalAddress: "",
@@ -40,8 +49,8 @@ export function AppointmentForm({ appointment, onSuccess, onCancel }: Appointmen
     time: "",
     notes: "",
   });
-
-  const [hospitalLocation, setHospitalLocation] = useState<HospitalLocation | null>(null);
+  const [hospitalLocation, setHospitalLocation] =
+    useState<HospitalLocation | undefined>();
   const [loading, setLoading] = useState(false);
   const [searchingLocation, setSearchingLocation] = useState(false);
   const { user } = useAuth();
@@ -68,28 +77,16 @@ export function AppointmentForm({ appointment, onSuccess, onCancel }: Appointmen
   }, [appointment]);
 
   useEffect(() => {
-    const existingScript = document.querySelector<HTMLScriptElement>(
-      'script[src^="https://maps.googleapis.com/maps/api/js"]'
-    );
-
-    if (!existingScript) {
+    if (!window.google) {
       const script = document.createElement("script");
-      script.src = `https://maps.googleapis.com/maps/api/js?key=AIzaSyBFIj4bvoggVuZftrZ-_Fjg3tF-HpV2gsM&libraries=places&callback=initMap`;
+      script.src = `https://maps.googleapis.com/maps/api/js?key=YOUR_GOOGLE_MAPS_API_KEY&libraries=places`;
       script.async = true;
       script.defer = true;
-      window.initMap = initializeMap;
+      script.onload = initializeMap;
       document.head.appendChild(script);
     } else {
-      if (window.google?.maps) {
-        initializeMap();
-      } else {
-        existingScript.addEventListener("load", initializeMap);
-      }
+      initializeMap();
     }
-
-    return () => {
-      existingScript?.removeEventListener("load", initializeMap);
-    };
   }, []);
 
   useEffect(() => {
@@ -98,48 +95,13 @@ export function AppointmentForm({ appointment, onSuccess, onCancel }: Appointmen
     }
   }, [hospitalLocation]);
 
-  useEffect(() => {
-    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
-    const handleChange = () => {
-      if (mapInstanceRef.current) {
-        mapInstanceRef.current.setOptions({ styles: getMapStyle() });
-      }
-    };
-    mediaQuery.addEventListener("change", handleChange);
-    return () => mediaQuery.removeEventListener("change", handleChange);
-  }, []);
-
-  const getMapStyle = () => {
-    const isDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-    return isDark
-      ? [
-          {
-            elementType: "geometry",
-            stylers: [{ color: "#1f2937" }],
-          },
-          {
-            elementType: "labels.text.stroke",
-            stylers: [{ color: "#1f2937" }],
-          },
-          {
-            elementType: "labels.text.fill",
-            stylers: [{ color: "#f9fafb" }],
-          },
-          {
-            featureType: "poi",
-            stylers: [{ visibility: "off" }],
-          },
-        ]
-      : [];
-  };
-
   const initializeMap = () => {
     if (mapRef.current && window.google) {
       const defaultLocation = { lat: 40.7128, lng: -74.006 };
+
       mapInstanceRef.current = new window.google.maps.Map(mapRef.current, {
         zoom: 13,
         center: hospitalLocation || defaultLocation,
-        // styles: getMapStyle(),
         disableDefaultUI: false,
       });
 
@@ -156,23 +118,12 @@ export function AppointmentForm({ appointment, onSuccess, onCancel }: Appointmen
 
     if (markerRef.current) {
       markerRef.current.setMap(null);
-      markerRef.current = null;
     }
 
     markerRef.current = new window.google.maps.Marker({
       position: location,
       map: mapInstanceRef.current,
       title: formData.hospitalName || "Hospital Location",
-      icon: {
-        url:
-          "data:image/svg+xml;charset=UTF-8," +
-          encodeURIComponent(`
-          <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M16 2C10.48 2 6 6.48 6 12C6 20 16 30 16 30S26 20 26 12C26 6.48 21.52 2 16 2ZM16 16C13.79 16 12 14.21 12 12S13.79 8 16 8S20 9.79 20 12S18.21 16 16 16Z" fill="#a855f7"/>
-          </svg>
-        `),
-        scaledSize: new window.google.maps.Size(32, 32),
-      },
     });
   };
 
@@ -185,24 +136,35 @@ export function AppointmentForm({ appointment, onSuccess, onCancel }: Appointmen
     setSearchingLocation(true);
 
     try {
-      const geocoder = new window.google.maps.Geocoder();
-      const query = `${formData.hospitalName} ${formData.hospitalAddress || "hospital"}`;
-      geocoder.geocode({ address: query }, (results, status) => {
-        if (status === "OK" && results?.[0]) {
-          const loc = results[0].geometry.location;
-          const newLocation = { lat: loc.lat(), lng: loc.lng() };
-          setHospitalLocation(newLocation);
+      if (window.google && window.google.maps) {
+        const geocoder = new window.google.maps.Geocoder();
+        const query = `${formData.hospitalName} ${formData.hospitalAddress || "hospital"}`;
 
-          if (!formData.hospitalAddress && results[0].formatted_address) {
-            setFormData((prev) => ({ ...prev, hospitalAddress: results[0].formatted_address }));
+        geocoder.geocode({ address: query }, (results, status) => {
+          if (status === "OK" && results && results[0]) {
+            const location = results[0].geometry.location;
+            const newLocation = {
+              lat: location.lat(),
+              lng: location.lng(),
+            };
+            setHospitalLocation(newLocation);
+
+            if (!formData.hospitalAddress && results[0].formatted_address) {
+              setFormData((prev) => ({
+                ...prev,
+                hospitalAddress: results[0].formatted_address,
+              }));
+            }
+
+            toast.success("Hospital location found!");
+          } else {
+            toast.error(
+              "Could not find hospital location. Please check the name and try again."
+            );
           }
-
-          toast.success("Hospital location found!");
-        } else {
-          toast.error("Could not find hospital location. Please check the name and try again.");
-        }
-        setSearchingLocation(false);
-      });
+          setSearchingLocation(false);
+        });
+      }
     } catch (error) {
       console.error("Error searching location:", error);
       toast.error("Failed to search location");
@@ -210,14 +172,39 @@ export function AppointmentForm({ appointment, onSuccess, onCancel }: Appointmen
     }
   };
 
+  const sendWhatsappMessage = async (to: string, text: string) => {
+    try {
+      await axios.post(
+        "/api/send-whatsapp",
+        {
+          to,
+          message: text,
+        },
+        {
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
+    } catch (error) {
+      console.error("WhatsApp send error:", error);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
 
-    if (!formData.hospitalName.trim() || !formData.hospitalAddress.trim() || !formData.doctorName.trim() || !formData.appointmentType || !formData.date || !formData.time) {
-      toast.error("Please fill in all required fields.");
-      return;
-    }
+    if (!formData.hospitalName.trim())
+      return toast.error("Hospital name is required");
+    if (!formData.hospitalAddress.trim())
+      return toast.error("Hospital address is required");
+    if (!formData.doctorName.trim())
+      return toast.error("Doctor name is required");
+    if (!formData.appointmentType)
+      return toast.error("Appointment type is required");
+    if (!formData.date) return toast.error("Date is required");
+    if (!formData.time) return toast.error("Time is required");
 
     setLoading(true);
 
@@ -232,15 +219,27 @@ export function AppointmentForm({ appointment, onSuccess, onCancel }: Appointmen
         time: formData.time,
         notes: formData.notes.trim(),
         hospitalLocation,
+       patientPhone: user.phoneNumber || "",
+
+        userName: user.displayName || "",
       };
 
-      if (appointment?.id) {
-        await updateAppointment(appointment.id, { ...appointmentData, hospitalLocation: hospitalLocation ?? undefined });
+      if (appointment && appointment.id) {
+        await updateAppointment(appointment.id, appointmentData);
         toast.success("Appointment updated successfully!");
       } else {
-        await addAppointment(user.uid, { ...appointmentData, hospitalLocation: hospitalLocation ?? undefined, status: "scheduled" });
+        await addAppointment(user.uid, {
+          ...appointmentData,
+          status: "scheduled",
+        });
         toast.success("Appointment booked successfully!");
       }
+
+    await sendWhatsappMessage(
+  `+91${formData.hospitalPhone}`,
+  `📋 New Appointment Request:\n👤 Patient: ${user.displayName}\n🏥 Hospital: ${formData.hospitalName}\n📅 Date: ${formData.date} at ${formData.time}\n📄 Notes: ${formData.notes || "None"}\n\nReply with *ACCEPT* or *REJECT*.`
+);
+
 
       onSuccess();
     } catch (error) {
@@ -253,102 +252,57 @@ export function AppointmentForm({ appointment, onSuccess, onCancel }: Appointmen
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      {/* Hospital Information */}
       <div className="space-y-4">
         <h3 className="text-lg font-semibold text-foreground">Hospital Information</h3>
 
         <div>
-          <Label htmlFor="hospitalName" className="text-muted-foreground">Hospital Name *</Label>
+          <Label htmlFor="hospitalName">Hospital Name *</Label>
           <div className="flex space-x-2 mt-1">
-            <Input
-              id="hospitalName"
-              value={formData.hospitalName}
-              onChange={(e) => setFormData({ ...formData, hospitalName: e.target.value })}
-              placeholder="Enter hospital name"
-              className="bg-muted border-border text-foreground focus:outline-none focus:ring-2 focus:ring-purple-600 flex-1 rounded-lg"
-              required
-            />
-            <Button
-              type="button"
-              onClick={searchHospitalLocation}
-              disabled={searchingLocation || !formData.hospitalName.trim()}
-              variant="outline"
-              className="bg-muted border-border text-foreground hover:bg-purple-600 hover:text-white rounded-lg h-10 w-10"
-              aria-label="Search hospital location"
-            >
-              {searchingLocation ? (
-                <div className="w-4 h-4 border-2 border-foreground border-t-transparent rounded-full animate-spin" />
-              ) : (
-                <Search className="h-4 w-4" />
-              )}
+            <Input id="hospitalName" value={formData.hospitalName} onChange={(e) => setFormData({ ...formData, hospitalName: e.target.value })} required />
+            <Button type="button" onClick={searchHospitalLocation} disabled={searchingLocation}> 
+              {searchingLocation ? "Searching..." : <Search className="h-4 w-4" />} 
             </Button>
           </div>
         </div>
 
         <div>
-          <Label htmlFor="hospitalAddress" className="text-muted-foreground">Hospital Address *</Label>
-          <Input
-            id="hospitalAddress"
-            value={formData.hospitalAddress}
-            onChange={(e) => setFormData({ ...formData, hospitalAddress: e.target.value })}
-            placeholder="Enter hospital address"
-            className="bg-muted border-border text-foreground focus:outline-none focus:ring-2 focus:ring-purple-600 mt-1 rounded-lg"
-            required
-          />
+          <Label htmlFor="hospitalAddress">Hospital Address *</Label>
+          <Input id="hospitalAddress" value={formData.hospitalAddress} onChange={(e) => setFormData({ ...formData, hospitalAddress: e.target.value })} required />
         </div>
 
         <div>
-          <Label htmlFor="hospitalPhone" className="text-muted-foreground">Hospital Phone</Label>
-          <Input
-            id="hospitalPhone"
-            value={formData.hospitalPhone}
-            onChange={(e) => setFormData({ ...formData, hospitalPhone: e.target.value })}
-            placeholder="Enter hospital phone number"
-            className="bg-muted border-border text-foreground focus:outline-none focus:ring-2 focus:ring-purple-600 mt-1 rounded-lg"
-          />
+          <Label htmlFor="hospitalPhone">Hospital Phone</Label>
+          <Input id="hospitalPhone" value={formData.hospitalPhone} onChange={(e) => setFormData({ ...formData, hospitalPhone: e.target.value })} />
         </div>
 
-        {/* Map */}
-        <div>
-          <Label className="text-muted-foreground">Hospital Location</Label>
-          <div className="mt-1 h-[250px] sm:h-[300px] bg-muted border border-border rounded-xl overflow-hidden shadow">
-            <div ref={mapRef} className="w-full h-full" />
-          </div>
-          {hospitalLocation && (
-            <p className="text-xs text-muted-foreground mt-1">
-              <MapPin className="inline h-3 w-3 mr-1" />
-              Location found: {hospitalLocation.lat.toFixed(6)}, {hospitalLocation.lng.toFixed(6)}
-            </p>
-          )}
+        <div className="h-48 bg-muted border rounded overflow-hidden">
+          <div ref={mapRef} className="w-full h-full" />
         </div>
+
+        {hospitalLocation && (
+          <p className="text-xs text-muted-foreground mt-1">
+            <MapPin className="inline h-3 w-3 mr-1" />
+            Location: {hospitalLocation.lat.toFixed(6)}, {hospitalLocation.lng.toFixed(6)}
+          </p>
+        )}
       </div>
 
-      {/* Appointment Details */}
       <div className="space-y-4">
         <h3 className="text-lg font-semibold text-foreground">Appointment Details</h3>
 
         <div>
-          <Label htmlFor="doctorName" className="text-muted-foreground">Doctor Name *</Label>
-          <Input
-            id="doctorName"
-            value={formData.doctorName}
-            onChange={(e) => setFormData({ ...formData, doctorName: e.target.value })}
-            placeholder="Enter doctor's name"
-            className="bg-muted border-border text-foreground focus:outline-none focus:ring-2 focus:ring-purple-600 mt-1 rounded-lg"
-            required
-          />
+          <Label htmlFor="doctorName">Doctor Name *</Label>
+          <Input id="doctorName" value={formData.doctorName} onChange={(e) => setFormData({ ...formData, doctorName: e.target.value })} required />
         </div>
 
+      
         <div>
-          <Label htmlFor="appointmentType" className="text-muted-foreground">Appointment Type *</Label>
-          <Select
-            value={formData.appointmentType}
-            onValueChange={(value) => setFormData({ ...formData, appointmentType: value })}
-          >
-            <SelectTrigger className="bg-muted border-border text-foreground focus:outline-none focus:ring-2 focus:ring-purple-600 mt-1 rounded-lg">
+          <Label htmlFor="appointmentType">Appointment Type *</Label>
+          <Select value={formData.appointmentType} onValueChange={(value) => setFormData({ ...formData, appointmentType: value })}>
+            <SelectTrigger>
               <SelectValue placeholder="Select appointment type" />
             </SelectTrigger>
-            <SelectContent className="bg-card border-border text-foreground shadow-lg rounded-lg">
+            <SelectContent>
               <SelectItem value="consultation">General Consultation</SelectItem>
               <SelectItem value="checkup">Regular Checkup</SelectItem>
               <SelectItem value="follow-up">Follow-up Visit</SelectItem>
@@ -363,59 +317,24 @@ export function AppointmentForm({ appointment, onSuccess, onCancel }: Appointmen
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <Label htmlFor="date" className="text-muted-foreground">Date *</Label>
-            <Input
-              id="date"
-              type="date"
-              value={formData.date}
-              onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-              className="bg-muted border-border text-foreground focus:outline-none focus:ring-2 focus:ring-purple-600 mt-1 rounded-lg"
-              min={new Date().toISOString().split("T")[0]}
-              required
-            />
+            <Label htmlFor="date">Date *</Label>
+            <Input type="date" id="date" value={formData.date} onChange={(e) => setFormData({ ...formData, date: e.target.value })} required />
           </div>
           <div>
-            <Label htmlFor="time" className="text-muted-foreground">Time *</Label>
-            <Input
-              id="time"
-              type="time"
-              value={formData.time}
-              onChange={(e) => setFormData({ ...formData, time: e.target.value })}
-              className="bg-muted border-border text-foreground focus:outline-none focus:ring-2 focus:ring-purple-600 mt-1 rounded-lg"
-              required
-            />
+            <Label htmlFor="time">Time *</Label>
+            <Input type="time" id="time" value={formData.time} onChange={(e) => setFormData({ ...formData, time: e.target.value })} required />
           </div>
         </div>
 
         <div>
-          <Label htmlFor="notes" className="text-muted-foreground">Notes (Optional)</Label>
-          <Textarea
-            id="notes"
-            value={formData.notes}
-            onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-            placeholder="Any additional notes or symptoms to discuss..."
-            className="bg-muted border-border text-foreground focus:outline-none focus:ring-2 focus:ring-purple-600 mt-1 min-h-[80px] resize-none rounded-lg"
-          />
+          <Label htmlFor="notes">Notes</Label>
+          <Textarea id="notes" value={formData.notes} onChange={(e) => setFormData({ ...formData, notes: e.target.value })} />
         </div>
       </div>
 
-      {/* Form Actions */}
       <div className="flex space-x-3 pt-4">
-        <Button
-          type="button"
-          variant="outline"
-          onClick={onCancel}
-          className="flex-1 border-border text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg"
-        >
-          Cancel
-        </Button>
-        <Button
-          type="submit"
-          disabled={loading}
-          className="flex-1 bg-purple-600 hover:bg-purple-700 text-white rounded-lg"
-        >
-          {loading ? "Saving..." : appointment ? "Update Appointment" : "Book Appointment"}
-        </Button>
+        <Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>
+        <Button type="submit" disabled={loading}>{loading ? "Saving..." : appointment ? "Update Appointment" : "Book Appointment"}</Button>
       </div>
     </form>
   );
