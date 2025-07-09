@@ -288,24 +288,44 @@ export function AppointmentForm({ appointment, onSuccess, onCancel }: Appointmen
 
      
 
-        <div>
-          <Label htmlFor="appointmentType">Appointment Type *</Label>
-          <Select value={formData.appointmentType} onValueChange={(value) => setFormData({ ...formData, appointmentType: value })}>
-            <SelectTrigger>
-              <SelectValue placeholder="Select appointment type" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="consultation">General Consultation</SelectItem>
-              <SelectItem value="checkup">Regular Checkup</SelectItem>
-              <SelectItem value="follow-up">Follow-up Visit</SelectItem>
-              <SelectItem value="specialist">Specialist Consultation</SelectItem>
-              <SelectItem value="emergency">Emergency Visit</SelectItem>
-              <SelectItem value="diagnostic">Diagnostic Tests</SelectItem>
-              <SelectItem value="surgery">Surgery Consultation</SelectItem>
-              <SelectItem value="therapy">Therapy Session</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+        <div className="space-y-2">
+  <Label htmlFor="appointmentType" className="text-sm font-medium">
+    Appointment Type *
+  </Label>
+  <Select
+    value={formData.appointmentType}
+    onValueChange={(value) => setFormData({ ...formData, appointmentType: value })}
+  >
+    <SelectTrigger
+      className="w-full rounded-md border border-gray-300 bg-white dark:bg-gray-800 dark:border-gray-700 px-3 py-2 text-sm text-gray-900 dark:text-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+    >
+      <SelectValue placeholder="Select appointment type" />
+    </SelectTrigger>
+    <SelectContent
+      className="z-50 w-full rounded-md border border-gray-300 bg-white dark:bg-gray-800 dark:border-gray-700 text-sm shadow-lg"
+    >
+      {[
+        { value: "consultation", label: "General Consultation" },
+        { value: "checkup", label: "Regular Checkup" },
+        { value: "follow-up", label: "Follow-up Visit" },
+        { value: "specialist", label: "Specialist Consultation" },
+        { value: "emergency", label: "Emergency Visit" },
+        { value: "diagnostic", label: "Diagnostic Tests" },
+        { value: "surgery", label: "Surgery Consultation" },
+        { value: "therapy", label: "Therapy Session" },
+      ].map((item) => (
+        <SelectItem
+          key={item.value}
+          value={item.value}
+          className="cursor-pointer px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-900 dark:text-white"
+        >
+          {item.label}
+        </SelectItem>
+      ))}
+    </SelectContent>
+  </Select>
+</div>
+
 
         <div className="grid grid-cols-2 gap-4">
           <div>
