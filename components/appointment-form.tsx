@@ -204,7 +204,7 @@ export function AppointmentForm({ appointment, onSuccess, onCancel }: Appointmen
         date: formData.date,
         time: formData.time,
         notes: formData.notes.trim(),
-        hospitalLocation,
+        hospitalLocation: hospitalLocation || undefined,
         patientPhone: user.phoneNumber,
         userName: user.displayName || "",
       };
