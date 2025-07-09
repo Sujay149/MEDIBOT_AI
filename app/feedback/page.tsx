@@ -134,7 +134,7 @@ export default function FeedbackPage() {
                     </p>
                     
                     <a
-                      href="https://wa.me/919346491221"
+                      href="https://wa.me/919211947517"
                       target="_blank"
                       rel="noopener noreferrer"
                       className="inline-flex items-center gap-2 px-4 py-2 text-white font-medium bg-green-600 rounded-md hover:scale-105 transition-transform"

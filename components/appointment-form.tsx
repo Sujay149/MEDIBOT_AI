@@ -1,4 +1,3 @@
-
 "use client";
 
 import type React from "react";
@@ -12,6 +11,12 @@ import { MapPin, Search } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { addAppointment, updateAppointment, type Appointment } from "@/lib/firestore";
 import { toast } from "sonner";
+
+declare global {
+  interface Window {
+    initMap: () => void;
+  }
+}
 
 interface AppointmentFormProps {
   appointment?: Appointment | null;
@@ -35,6 +40,7 @@ export function AppointmentForm({ appointment, onSuccess, onCancel }: Appointmen
     time: "",
     notes: "",
   });
+
   const [hospitalLocation, setHospitalLocation] = useState<HospitalLocation | null>(null);
   const [loading, setLoading] = useState(false);
   const [searchingLocation, setSearchingLocation] = useState(false);
@@ -62,17 +68,28 @@ export function AppointmentForm({ appointment, onSuccess, onCancel }: Appointmen
   }, [appointment]);
 
   useEffect(() => {
-    // Load Google Maps script
-    if (!window.google) {
+    const existingScript = document.querySelector<HTMLScriptElement>(
+      'script[src^="https://maps.googleapis.com/maps/api/js"]'
+    );
+
+    if (!existingScript) {
       const script = document.createElement("script");
-      script.src = `https://maps.googleapis.com/maps/api/js?key=AIzaSyBFIj4bvoggVuZftrZ-_Fjg3tF-HpV2gsM&libraries=places`;
+      script.src = `https://maps.googleapis.com/maps/api/js?key=AIzaSyBFIj4bvoggVuZftrZ-_Fjg3tF-HpV2gsM&libraries=places&callback=initMap`;
       script.async = true;
       script.defer = true;
-      script.onload = initializeMap;
+      window.initMap = initializeMap;
       document.head.appendChild(script);
     } else {
-      initializeMap();
+      if (window.google?.maps) {
+        initializeMap();
+      } else {
+        existingScript.addEventListener("load", initializeMap);
+      }
     }
+
+    return () => {
+      existingScript?.removeEventListener("load", initializeMap);
+    };
   }, []);
 
   useEffect(() => {
@@ -81,27 +98,49 @@ export function AppointmentForm({ appointment, onSuccess, onCancel }: Appointmen
     }
   }, [hospitalLocation]);
 
-  const initializeMap = () => {
-    if (mapRef.current && window.google) {
-      const defaultLocation = { lat: 40.7128, lng: -74.006 }; // New York City default
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+    const handleChange = () => {
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.setOptions({ styles: getMapStyle() });
+      }
+    };
+    mediaQuery.addEventListener("change", handleChange);
+    return () => mediaQuery.removeEventListener("change", handleChange);
+  }, []);
 
-      mapInstanceRef.current = new window.google.maps.Map(mapRef.current, {
-        zoom: 13,
-        center: hospitalLocation || defaultLocation,
-        styles: [
+  const getMapStyle = () => {
+    const isDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    return isDark
+      ? [
           {
             elementType: "geometry",
-            stylers: [{ color: "#18181b" }], // zinc-900
+            stylers: [{ color: "#1f2937" }],
           },
           {
             elementType: "labels.text.stroke",
-            stylers: [{ color: "#18181b" }], // zinc-900
+            stylers: [{ color: "#1f2937" }],
           },
           {
             elementType: "labels.text.fill",
-            stylers: [{ color: "#a855f7" }], // purple-600
+            stylers: [{ color: "#f9fafb" }],
           },
-        ],
+          {
+            featureType: "poi",
+            stylers: [{ visibility: "off" }],
+          },
+        ]
+      : [];
+  };
+
+  const initializeMap = () => {
+    if (mapRef.current && window.google) {
+      const defaultLocation = { lat: 40.7128, lng: -74.006 };
+      mapInstanceRef.current = new window.google.maps.Map(mapRef.current, {
+        zoom: 13,
+        center: hospitalLocation || defaultLocation,
+        // styles: getMapStyle(),
+        disableDefaultUI: false,
       });
 
       if (hospitalLocation) {
@@ -117,6 +156,7 @@ export function AppointmentForm({ appointment, onSuccess, onCancel }: Appointmen
 
     if (markerRef.current) {
       markerRef.current.setMap(null);
+      markerRef.current = null;
     }
 
     markerRef.current = new window.google.maps.Marker({
@@ -145,34 +185,24 @@ export function AppointmentForm({ appointment, onSuccess, onCancel }: Appointmen
     setSearchingLocation(true);
 
     try {
-      if (window.google && window.google.maps) {
-        const geocoder = new window.google.maps.Geocoder();
-        const query = `${formData.hospitalName} ${formData.hospitalAddress || "hospital"}`;
+      const geocoder = new window.google.maps.Geocoder();
+      const query = `${formData.hospitalName} ${formData.hospitalAddress || "hospital"}`;
+      geocoder.geocode({ address: query }, (results, status) => {
+        if (status === "OK" && results?.[0]) {
+          const loc = results[0].geometry.location;
+          const newLocation = { lat: loc.lat(), lng: loc.lng() };
+          setHospitalLocation(newLocation);
 
-        geocoder.geocode({ address: query }, (results, status) => {
-          if (status === "OK" && results && results[0]) {
-            const location = results[0].geometry.location;
-            const newLocation = {
-              lat: location.lat(),
-              lng: location.lng(),
-            };
-            setHospitalLocation(newLocation);
-
-            // Update address if not provided
-            if (!formData.hospitalAddress && results[0].formatted_address) {
-              setFormData((prev) => ({
-                ...prev,
-                hospitalAddress: results[0].formatted_address,
-              }));
-            }
-
-            toast.success("Hospital location found!");
-          } else {
-            toast.error("Could not find hospital location. Please check the name and try again.");
+          if (!formData.hospitalAddress && results[0].formatted_address) {
+            setFormData((prev) => ({ ...prev, hospitalAddress: results[0].formatted_address }));
           }
-          setSearchingLocation(false);
-        });
-      }
+
+          toast.success("Hospital location found!");
+        } else {
+          toast.error("Could not find hospital location. Please check the name and try again.");
+        }
+        setSearchingLocation(false);
+      });
     } catch (error) {
       console.error("Error searching location:", error);
       toast.error("Failed to search location");
@@ -184,29 +214,8 @@ export function AppointmentForm({ appointment, onSuccess, onCancel }: Appointmen
     e.preventDefault();
     if (!user) return;
 
-    // Validate required fields
-    if (!formData.hospitalName.trim()) {
-      toast.error("Hospital name is required");
-      return;
-    }
-    if (!formData.hospitalAddress.trim()) {
-      toast.error("Hospital address is required");
-      return;
-    }
-    if (!formData.doctorName.trim()) {
-      toast.error("Doctor name is required");
-      return;
-    }
-    if (!formData.appointmentType) {
-      toast.error("Appointment type is required");
-      return;
-    }
-    if (!formData.date) {
-      toast.error("Date is required");
-      return;
-    }
-    if (!formData.time) {
-      toast.error("Time is required");
+    if (!formData.hospitalName.trim() || !formData.hospitalAddress.trim() || !formData.doctorName.trim() || !formData.appointmentType || !formData.date || !formData.time) {
+      toast.error("Please fill in all required fields.");
       return;
     }
 
@@ -225,10 +234,7 @@ export function AppointmentForm({ appointment, onSuccess, onCancel }: Appointmen
         hospitalLocation,
       };
 
-      console.log("Submitting appointment data:", appointmentData);
-      console.log("User ID:", user.uid);
-
-      if (appointment && appointment.id) {
+      if (appointment?.id) {
         await updateAppointment(appointment.id, { ...appointmentData, hospitalLocation: hospitalLocation ?? undefined });
         toast.success("Appointment updated successfully!");
       } else {
@@ -305,7 +311,7 @@ export function AppointmentForm({ appointment, onSuccess, onCancel }: Appointmen
         {/* Map */}
         <div>
           <Label className="text-muted-foreground">Hospital Location</Label>
-          <div className="mt-1 h-48 bg-muted border border-border rounded-lg overflow-hidden">
+          <div className="mt-1 h-[250px] sm:h-[300px] bg-muted border border-border rounded-xl overflow-hidden shadow">
             <div ref={mapRef} className="w-full h-full" />
           </div>
           {hospitalLocation && (
