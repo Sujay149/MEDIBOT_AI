@@ -304,8 +304,8 @@ export default function AppointmentsPage() {
                                 <div className="truncate">
                                   <div className="flex items-center space-x-1">
                                     <h3 className="font-medium text-sm truncate text-gray-900 dark:text-gray-100">
-  {appointment.hospitalName}
-</h3>
+                                        {appointment.hospitalName}
+                                    </h3>
 
                                     <Badge className="bg-green-600 text-white text-xs px-1.5 py-0.5">
                                       Done

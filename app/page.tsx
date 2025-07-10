@@ -11,16 +11,11 @@ export default function HomePage() {
   const blueButton =
     "h-10 px-6 bg-[#1a103d] text-white border border-[#a970ff] rounded-full text-base font-medium shadow-none hover:bg-[#1a103d] hover:border-[#a970ff] hover:text-white"
 
-
-
   const primaryButton =
-   "h-10 px-6 bg-[#1a103d] text-white border border-[#a970ff] rounded-full text-base font-medium shadow-none hover:bg-[#1a103d] hover:border-[#a970ff] hover:text-white"
+    "h-10 px-6 bg-[#1a103d] text-white border border-[#a970ff] rounded-full text-base font-medium shadow-none hover:bg-[#1a103d] hover:border-[#a970ff] hover:text-white"
 
-
-
-const headerButton =
-  "h-10 px-6 bg-[#1a103d] text-white border border-[#a970ff] rounded-full text-base font-medium shadow-none hover:bg-[#1a103d] hover:border-[#a970ff] hover:text-white"
-
+  const headerButton =
+    "h-10 px-6 bg-[#1a103d] text-white border border-[#a970ff] rounded-full text-base font-medium shadow-none hover:bg-[#1a103d] hover:border-[#a970ff] hover:text-white"
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-purple-950/30 to-slate-900 text-white flex flex-col items-center justify-start overflow-x-hidden">
@@ -54,51 +49,60 @@ const headerButton =
         </div>
       </header>
 
-      {/* Hero Section */}
-      <motion.section
-        initial={{ opacity: 0, y: 30 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.8 }}
-        className="w-full max-w-7xl mx-auto text-center pt-36 pb-20 px-6 relative"
-      >
-        <motion.div 
-          animate={{
-            scale: [1, 1.05, 1],
-            opacity: [0.8, 1, 0.8],
-          }}
-          transition={{
-            duration: 8,
-            repeat: Infinity,
-            ease: "easeInOut"
-          }}
-          className="absolute -top-20 left-1/2 -translate-x-1/2 w-[400px] h-[400px] bg-gradient-to-r from-purple-500/10 to-blue-500/10 rounded-full blur-[80px] pointer-events-none"
-        />
-        
-        <h1 className="text-5xl md:text-7xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-blue-500 leading-tight">
-          Transform Your Health <br />With <span className="underline decoration-purple-400/30 underline-offset-8">MediBot</span>
-        </h1>
-        <p className="mt-8 text-lg md:text-xl text-slate-300 max-w-3xl mx-auto leading-relaxed">
-          Your AI-powered health companion that simplifies medication management, provides personalized insights, and ensures you never miss a dose.
-        </p>
-        <div className="mt-12 flex flex-col sm:flex-row justify-center gap-6">
-        
-          <Link href="/auth/signup">
-            <Button className={`${primaryButton} w-60 h-14 text-lg`}>
-              Try For Free
-            </Button>
-          </Link>
+      {/* Hero Section (from shape-hero.json) */}
+      <section className="relative py-12 md:pt-36 lg:pb-24 overflow-hidden">
+        <div className="absolute inset-0">
+          <svg className="absolute top-0 left-0 w-full h-full" preserveAspectRatio="none" viewBox="0 0 1440 800">
+            <path d="M0,0 C300,100 600,50 900,150 C1200,250 1440,200 1440,400 V800 H0 Z" fill="url(#gradient)" />
+            <defs>
+              <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" style={{ stopColor: '#6b21a8', stopOpacity: 0.1 }} />
+                <stop offset="100%" style={{ stopColor: '#3b0764', stopOpacity: 0.1 }} />
+              </linearGradient>
+            </defs>
+          </svg>
         </div>
-        
-        {/* Hero Image/Illustration Placeholder */}
-        <motion.div 
-          initial={{ opacity: 0, y: 50 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4, duration: 0.8 }}
-          className="mt-16 mx-auto w-full max-w-4xl h-80 bg-slate-800/50 rounded-2xl border border-white/10 backdrop-blur-sm shadow-xl shadow-purple-500/10 flex items-center justify-center"
-        >
-          <div className="text-slate-400">App Preview Illustration</div>
-        </motion.div>
-      </motion.section>
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center">
+            <motion.h1
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8 }}
+              className="text-4xl font-extrabold tracking-tight text-white sm:text-5xl md:text-6xl"
+            >
+              Transform Your Health with MediBot
+            </motion.h1>
+            <motion.p
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8, delay: 0.2 }}
+              className="mt-6 max-w-2xl mx-auto text-xl text-gray-300"
+            >
+              Your AI-powered health companion that simplifies medication management, provides personalized insights, and ensures you never miss a dose.
+            </motion.p>
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8, delay: 0.4 }}
+              className="mt-10 flex justify-center gap-4"
+            >
+              <Button
+                asChild
+                className="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-full shadow-sm text-white bg-[#1a103d] border-[#a970ff] hover:bg-[#1a103d] hover:border-[#a970ff] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#a970ff]"
+              >
+                <Link href="/auth/signup">Get Started</Link>
+              </Button>
+              <Button
+                asChild
+                variant="outline"
+                className="inline-flex items-center px-6 py-3 border border-[#a970ff] text-base font-medium rounded-full text-white bg-transparent hover:bg-[#1a103d] hover:text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#a970ff]"
+              >
+                <Link href="/demo">Learn More</Link>
+              </Button>
+            </motion.div>
+          </div>
+        </div>
+      </section>
 
       {/* Features Section */}
       <motion.section
