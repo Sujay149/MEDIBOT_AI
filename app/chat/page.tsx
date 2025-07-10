@@ -605,8 +605,8 @@ function ChatContent() {
       utteranceRef.current = null;
     };
     utterance.onerror = (event) => {
-      console.error("Speech synthesis error:", event.error);
-      toast.error(`Text-to-speech failed: ${event.error}`);
+     
+      toast.error(` speech Stopped`);
       setIsSpeaking(false);
       utteranceRef.current = null;
     };
@@ -1325,96 +1325,105 @@ function ChatContent() {
           </ScrollArea>
 
           {/* Input Area */}
-          {user && (
-            <div className="p-6 border-t border-border bg-card sticky bottom-0">
-              <div className="max-w-3xl mx-auto">
-                <div className="flex flex-col space-y-3">
-                  <div className="flex items-center space-x-3">
-                    <div className="relative flex-1">
-                      <Input
-                        value={message}
-                        onChange={(e) => setMessage(e.target.value)}
-                        onKeyPress={handleKeyPress}
-                        placeholder="Ask a health question or upload an image..."
-                        className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-foreground placeholder-gray-400 dark:placeholder-gray-500 h-12 rounded-lg px-4 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm transition-all"
-                        disabled={loading || isRecording}
-                        maxLength={1000}
-                        aria-label="Chat message input"
-                      />
-                      <div className="absolute right-3 top-1/2 transform -translate-y-1/2 flex items-center space-x-2">
-                        <Button
-                          onClick={handleToggleRecording}
-                          variant="ghost"
-                          size="icon"
-                          className={`bg-purple-600 hover:bg-purple-700 text-white h-8 w-8 rounded-full ${isRecording ? "animate-pulse bg-red-600" : ""}`}
-                          title={isRecording ? "Stop Recording" : "Record Voice"}
-                          aria-label={isRecording ? "Stop Recording" : "Record Voice"}
-                        >
-                          <Mic className="h-5 w-5" />
-                        </Button>
-                        <Button
-                          onClick={handleFileUpload}
-                          variant="ghost"
-                          size="icon"
-                          className="bg-purple-600 hover:bg-purple-700 text-white h-8 w-8 rounded-full"
-                          title="Upload Image"
-                          aria-label="Upload Image"
-                        >
-                          <Upload className="h-5 w-5" />
-                        </Button>
-                        <input
-                          ref={fileInputRef}
-                          type="file"
-                          accept="image/*"
-                          onChange={handleFileChange}
-                          className="hidden"
-                        />
-                        <Select value={selectedModel} onValueChange={setSelectedModel}>
-                          <SelectTrigger className="w-[130px] bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-foreground text-sm h-8 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm">
-                            <SelectValue placeholder="Model" />
-                          </SelectTrigger>
-                          <SelectContent className="bg-card border-gray-200 dark:border-gray-700 text-foreground text-sm shadow-lg rounded-lg">
-                            <SelectItem value="gemini-1.5-flash-latest">Gemini 1.5 Flash</SelectItem>
-                            <SelectItem value="gemini-1.5-pro-latest">GPT-4o</SelectItem>
-                            <SelectItem value="grok">Grok</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                    <Button
-                      onClick={handleSendMessage}
-                      disabled={loading || (!message.trim() && !selectedFile)}
-                      className="bg-purple-600 hover:bg-purple-700 text-white rounded-full h-12 w-12 shadow-md disabled:opacity-50 transition-all"
-                      aria-label="Send Message"
-                    >
-                      <Send className="h-5 w-5" />
-                    </Button>
-                  </div>
-                  {fileName && (
-                    <div className="flex items-center space-x-2">
-                      <Badge
-                        variant="secondary"
-                        className="bg-gray-200 dark:bg-gray-700 text-muted-foreground text-sm truncate max-w-[300px] rounded-lg"
-                      >
-                        {fileName}
-                      </Badge>
-                      <Button
-                        onClick={removeFile}
-                        variant="ghost"
-                        size="icon"
-                        className="bg-purple-600 hover:bg-purple-700 text-white h-8 w-8 rounded-full"
-                        title="Remove File"
-                        aria-label="Remove File"
-                      >
-                        <X className="h-5 w-5" />
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
+ {user && (
+  <div className="sticky bottom-0 z-10 w-full bg-[#0E1628] px-4 pb-6 pt-4">
+    <div className="mx-auto max-w-3xl">
+      {/* Unified input box with subtle border and rounded corners */}
+      <div className="flex flex-col gap-2 rounded-xl bg-[#111C2F] px-4 py-3 shadow-sm text-muted-foreground">
+
+        {/* Input */}
+        <textarea
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+          onKeyDown={handleKeyPress}
+          placeholder="Ask a health question or upload an image..."
+          className="w-full resize-none bg-transparent text-sm placeholder-gray-400 text-white outline-none"
+          rows={1}
+          maxLength={1000}
+          disabled={loading || isRecording}
+        />
+
+        {/* Action bar below input */}
+        <div className="flex justify-between items-center pt-2">
+
+          {/* Left group: model select, upload, mic */}
+          <div className="flex items-center gap-2">
+            <Select value={selectedModel} onValueChange={setSelectedModel}>
+              <SelectTrigger className="h-7 bg-[#1C2A3F] text-sm text-gray-300 border-none rounded-md focus:ring-1 focus:ring-purple-500">
+                <SelectValue placeholder="Model" />
+              </SelectTrigger>
+              <SelectContent className="bg-[#1C2A3F] text-white text-sm border-none">
+                <SelectItem value="gemini-1.5-flash-latest">Gemini 1.5 Flash</SelectItem>
+                <SelectItem value="gemini-1.5-pro-latest">GPT-4o</SelectItem>
+                <SelectItem value="grok">Grok</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Button
+              onClick={handleFileUpload}
+              size="icon"
+              variant="ghost"
+              className="h-8 w-8 text-gray-300 hover:text-white"
+              title="Upload Image"
+            >
+              <Upload className="h-4 w-4" />
+            </Button>
+
+            <Button
+              onClick={handleToggleRecording}
+              size="icon"
+              variant="ghost"
+              className={`h-8 w-8 ${
+                isRecording ? "bg-red-600 animate-pulse" : "text-gray-300 hover:text-white"
+              }`}
+              title={isRecording ? "Stop Recording" : "Record Voice"}
+            >
+              <Mic className="h-4 w-4" />
+            </Button>
+
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleFileChange}
+              className="hidden"
+            />
+          </div>
+
+          {/* Send button on right */}
+          <Button
+            onClick={handleSendMessage}
+            disabled={loading || (!message.trim() && !selectedFile)}
+            className="h-8 w-8 text-gray-300 hover:text-white disabled:opacity-40"
+            variant="ghost"
+            aria-label="Send Message"
+          >
+            <Send className="h-4 w-4" />
+          </Button>
         </div>
+
+        {/* File badge */}
+        {fileName && (
+          <div className="flex items-center gap-2 pt-1">
+            <Badge className="bg-gray-700 text-sm text-gray-300 truncate max-w-[300px]">
+              {fileName}
+            </Badge>
+            <Button
+              onClick={removeFile}
+              size="icon"
+              variant="ghost"
+              className="h-7 w-7 text-red-400 hover:text-red-600"
+              title="Remove File"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
+      </div>
+    </div>
+  </div>
+)}
+  </div>
 
         {/* Prescription Analysis Dialog */}
         {user && (
