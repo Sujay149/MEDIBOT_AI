@@ -62,8 +62,8 @@ export default function HomePage() {
             </defs>
           </svg>
         </div>
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center">
+        <div className="relative max-w-7xl mt-20 mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center ">
             <motion.h1
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
