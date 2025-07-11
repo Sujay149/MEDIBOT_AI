@@ -735,7 +735,7 @@ function ChatContent() {
       if (selectedModel === "medibot") {
         headers.Authorization = `Bearer ${process.env.NEXT_PUBLIC_XAI_API_KEY}`;
       } else if (selectedModel === "grok") {
-        headers.Authorization = `Bearer ${process.env.NEXT_PUBLIC_XAI_API_KEY}`;
+        headers.Authorization = `Bearer ${process.env.NEXT_PUBLIC_GROQ_API_KEY}`;
       }
 
       const body = selectedModel === "medibot"
