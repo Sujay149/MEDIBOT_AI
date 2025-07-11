@@ -733,7 +733,7 @@ function ChatContent() {
       };
 
       if (selectedModel === "medibot") {
-        headers.Authorization = `Bearer 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`;
+        headers.Authorization = `Bearer ${process.env.NEXT_PUBLIC_XAI_API_KEY}`;
       } else if (selectedModel === "grok") {
         headers.Authorization = `Bearer ${process.env.NEXT_PUBLIC_XAI_API_KEY}`;
       }
