@@ -666,10 +666,11 @@ function ChatContent() {
         // Use Groq API for MediBot
         response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer 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`,
-          },
+         headers: {
+  "Content-Type": "application/json",
+  Authorization: `Bearer ${process.env.NEXT_PUBLIC_GROQ_API_KEY}`,
+},
+
           body: JSON.stringify({
             model: "llama-3.3-70b-versatile",
             messages: [{ role: "user", content: prompt }],
