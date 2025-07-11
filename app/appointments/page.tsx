@@ -6,13 +6,31 @@ import { AuthGuard } from "@/components/auth-guard";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Menu, Calendar, Plus, MapPin, Clock, User, Phone, Trash2, Edit, Navigation } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Menu,
+  Calendar,
+  Plus,
+  Clock,
+  User,
+  Trash2,
+  Edit,
+  Navigation,
+} from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { AppointmentForm } from "@/components/appointment-form";
-import { deleteAppointment, subscribeToUserAppointments, type Appointment } from "@/lib/firestore";
+import {
+  deleteAppointment,
+  subscribeToUserAppointments,
+  type Appointment,
+} from "@/lib/firestore";
 import { toast } from "sonner";
-import axios from "axios";
 
 export default function AppointmentsPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -22,138 +40,109 @@ export default function AppointmentsPage() {
   const [editingAppointment, setEditingAppointment] = useState<Appointment | null>(null);
   const { user } = useAuth();
   const [isMobile, setIsMobile] = useState(false);
+  const [error, setError] = useState(false);
+  const [search, setSearch] = useState("");
 
   useEffect(() => {
-    const checkIfMobile = () => setIsMobile(window.innerWidth < 768);
-    checkIfMobile();
-    window.addEventListener('resize', checkIfMobile);
-    return () => window.removeEventListener('resize', checkIfMobile);
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
   useEffect(() => {
     if (!user) return;
-
     const unsubscribe = subscribeToUserAppointments(user.uid, (userAppointments) => {
       setAppointments(userAppointments);
       setLoading(false);
+      setError(false);
     });
-
     return unsubscribe;
   }, [user]);
 
-  const handleAddAppointment = () => {
-    setEditingAppointment(null);
-    setDialogOpen(true);
-  };
+  const filteredAppointments = appointments.filter((a) =>
+    a.hospitalName.toLowerCase().includes(search.toLowerCase()) ||
+    a.doctorName.toLowerCase().includes(search.toLowerCase())
+  );
 
-  const handleEditAppointment = (appointment: Appointment) => {
-    setEditingAppointment(appointment);
-    setDialogOpen(true);
-  };
+  const upcomingAppointments = filteredAppointments.filter((apt) => new Date(`${apt.date}T${apt.time}`) >= new Date());
+  const pastAppointments = filteredAppointments.filter((apt) => new Date(`${apt.date}T${apt.time}`) < new Date());
 
-  const handleDeleteAppointment = async (appointmentId: string) => {
-    if (!window.confirm("Are you sure you want to delete this appointment?")) return;
-
-    try {
-      await deleteAppointment(appointmentId);
-      toast.success("Appointment deleted successfully!");
-    } catch (error) {
-      console.error("Error deleting appointment:", error);
-      toast.error("Failed to delete appointment");
-    }
-  };
-
-  const handleGetDirections = (appointment: Appointment) => {
-    if (appointment.hospitalLocation) {
-      const { lat, lng } = appointment.hospitalLocation;
-      const url = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&travelmode=driving`;
-      window.open(url, "_blank");
-    } else {
-      const query = encodeURIComponent(appointment.hospitalName);
-      const url = `https://www.google.com/maps/search/?api=1&query=${query}`;
-      window.open(url, "_blank");
-    }
-  };
-
-  const getAppointmentStatus = (appointment: Appointment) => {
+  const getStatus = (apt: Appointment) => {
     const now = new Date();
-    const appointmentDate = new Date(`${appointment.date}T${appointment.time}`);
-
-    if (appointmentDate < now) {
-      return { status: "completed", color: "bg-green-600" };
-    } else if (appointmentDate.getTime() - now.getTime() <= 24 * 60 * 60 * 1000) {
-      return { status: "upcoming", color: "bg-yellow-600" };
-    } else {
-      return { status: "scheduled", color: "bg-blue-600" };
-    }
+    const aptDate = new Date(`${apt.date}T${apt.time}`);
+    if (aptDate < now) return { label: "Done", color: "bg-green-600 dark:bg-green-500" };
+    if (aptDate.getTime() - now.getTime() < 24 * 60 * 60 * 1000) return { label: "Soon", color: "bg-yellow-600 dark:bg-yellow-500" };
+    return { label: "Scheduled", color: "bg-blue-600 dark:bg-blue-500" };
   };
 
-  const upcomingAppointments = appointments.filter((apt) => {
-    const appointmentDate = new Date(`${apt.date}T${apt.time}`);
-    return appointmentDate >= new Date();
-  });
-
-  const pastAppointments = appointments.filter((apt) => {
-    const appointmentDate = new Date(`${apt.date}T${apt.time}`);
-    return appointmentDate < new Date();
-  });
-
-  const formatDateForMobile = (dateString: string) => {
-    const date = new Date(dateString);
-    return isMobile 
-      ? date.toLocaleDateString("en-US", { month: "short", day: "numeric" })
-      : date.toLocaleDateString("en-US", { 
-          weekday: "short", 
-          month: "short", 
-          day: "numeric" 
-        });
+  const formatDate = (date: string) => {
+    const d = new Date(date);
+    return isMobile
+      ? d.toLocaleDateString("en-US", { month: "short", day: "numeric" })
+      : d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
   };
 
-  const formatTimeForMobile = (timeString: string) => {
-    return isMobile 
-      ? timeString.replace(/:00$/, '') // Remove :00 if it's exactly on the hour
-      : timeString;
+  const formatTime = (time: string) => (isMobile ? time.replace(/:00$/, "") : time);
+
+  const handleDirections = (apt: Appointment) => {
+    const url = apt.hospitalLocation
+      ? `https://www.google.com/maps/dir/?api=1&destination=${apt.hospitalLocation.lat},${apt.hospitalLocation.lng}&travelmode=driving`
+      : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(apt.hospitalName)}`;
+    window.open(url, "_blank");
   };
 
   return (
     <AuthGuard>
-      <div className="bg-background text-foreground min-h-screen flex h-screen overflow-hidden">
+      <div className="flex min-h-screen bg-white dark:bg-[#0e1a2b] text-black dark:text-white">
         <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+        <div className="flex-1 overflow-y-auto px-4 pt-10 max-w-5xl mx-auto">
+          {/* Header without Theme Toggle */}
+          <div className="text-center mb-8">
+            <h1 className="text-3xl font-bold text-[#a855f7]">Book Your Appointment</h1>
+            <p className="text-muted-foreground mt-1 mb-6">Choose from our premium healthcare network</p>
+          </div>
 
-        <div className="flex-1 flex flex-col overflow-hidden">
-          {/* Mobile-optimized header */}
-          <div className="flex items-center justify-between p-3 border-b border-border bg-card sticky top-0 z-10">
-            <div className="flex items-center space-x-2">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setSidebarOpen(true)}
-                className="text-muted-foreground hover:text-foreground h-9 w-9"
-                aria-label="Open sidebar"
-              >
-                <Menu className="h-5 w-5" />
-              </Button>
-              <div className="w-8 h-8 bg-purple-600 rounded-full flex items-center justify-center">
-                <Calendar className="h-3.5 w-3.5 text-white" />
-              </div>
-              <span className="font-semibold text-base">Appointments</span>
+          {/* Search Bar */}
+          <div className="relative max-w-2xl mx-auto mb-8">
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search by hospital, doctor, location..."
+              className="w-full pl-10 pr-4 py-3 rounded-full bg-card text-foreground placeholder-muted-foreground border border-border focus:outline-none focus:ring-2 focus:ring-teal-500"
+            />
+            <div className="absolute top-1/2 left-3 transform -translate-y-1/2 text-muted-foreground">
+              <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35m1.62-5.88a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
             </div>
+          </div>
 
+          {/* Error Message */}
+          {error && (
+            <div className="mt-4 bg-card text-red-400 dark:text-red-600 px-4 py-3 rounded-xl text-center shadow">
+              Error loading hospitals. Showing sample data.
+            </div>
+          )}
+
+          {/* Appointments Header */}
+          <div className="flex justify-between items-center mt-10 mb-4">
+            <h2 className="text-xl font-semibold text-foreground">Your Appointments</h2>
             <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
               <DialogTrigger asChild>
                 <Button
-                  onClick={handleAddAppointment}
-                  size="icon"
-                  className="bg-purple-600 hover:bg-purple-700 text-white rounded-lg h-9 w-9"
+                  onClick={() => {
+                    setEditingAppointment(null);
+                    setDialogOpen(true);
+                  }}
+                  className="bg-[#a855f7] hover:bg-teal-600 dark:bg-[#a855f7] dark:hover:bg-teal-600 text-white rounded-lg text-sm px-4 py-2"
                 >
-                  <Plus className="h-4 w-4" />
+                  <Plus className="mr-1 h-4 w-4 " /> Book
                 </Button>
               </DialogTrigger>
-              <DialogContent className="bg-card border-border max-w-[95vw] rounded-lg mx-auto max-h-[90vh] overflow-y-auto p-4">
+              <DialogContent className="bg-card text-foreground border-border max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
-                  <DialogTitle className="text-base">
-                    {editingAppointment ? "Edit Appointment" : "New Appointment"}
-                  </DialogTitle>
+                  <DialogTitle>{editingAppointment ? "Edit" : "New"} Appointment</DialogTitle>
                 </DialogHeader>
                 <AppointmentForm
                   appointment={editingAppointment}
@@ -161,206 +150,128 @@ export default function AppointmentsPage() {
                     setDialogOpen(false);
                     setEditingAppointment(null);
                   }}
-                  onCancel={() => {
-                    setDialogOpen(false);
-                    setEditingAppointment(null);
-                  }}
+                  onCancel={() => setDialogOpen(false)}
                 />
               </DialogContent>
             </Dialog>
           </div>
 
-          {/* Mobile-optimized content */}
-          <div className="flex-1 p-3 overflow-y-auto">
-            <div className="max-w-full mx-auto space-y-4">
-              <div>
-                <h1 className="text-lg font-semibold">Your Appointments</h1>
-                <p className="text-muted-foreground text-xs">Manage your medical schedules</p>
-              </div>
-
-              {/* Mobile stats cards */}
-              <div className="grid grid-cols-3 gap-2">
-                <Card className="bg-card border-border rounded-lg shadow-sm">
-                  <CardContent className="p-3 text-center">
-                    <div className="text-xl font-semibold text-purple-600">{appointments.length}</div>
-                    <div className="text-muted-foreground text-xs">Total</div>
-                  </CardContent>
-                </Card>
-                <Card className="bg-card border-border rounded-lg shadow-sm">
-                  <CardContent className="p-3 text-center">
-                    <div className="text-xl font-semibold text-yellow-600">{upcomingAppointments.length}</div>
-                    <div className="text-muted-foreground text-xs">Upcoming</div>
-                  </CardContent>
-                </Card>
-                <Card className="bg-card border-border rounded-lg shadow-sm">
-                  <CardContent className="p-3 text-center">
-                    <div className="text-xl font-semibold text-green-600">{pastAppointments.length}</div>
-                    <div className="text-muted-foreground text-xs">Completed</div>
-                  </CardContent>
-                </Card>
-              </div>
-
-              {loading ? (
-                <div className="text-center py-6">
-                  <div className="w-5 h-5 border-3 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
-                  <p className="text-muted-foreground text-xs">Loading appointments...</p>
-                </div>
-              ) : appointments.length > 0 ? (
-                <div className="space-y-3">
-                  {/* Upcoming Appointments - Mobile cards */}
-                  {upcomingAppointments.length > 0 && (
-                    <div>
-                      <h2 className="text-base font-semibold mb-2">Upcoming</h2>
-                      <div className="space-y-2">
-                        {upcomingAppointments.map((appointment) => {
-                          const { status, color } = getAppointmentStatus(appointment);
-                          return (
-                            <Card key={appointment.id} className="bg-card border-border rounded-lg shadow-sm">
-                              <CardContent className="p-3">
-                                <div className="flex justify-between items-start">
-                                  <div className="flex-1">
-                                    <div className="flex items-center space-x-1 mb-1">
-                                   <h3 className="font-medium text-sm line-clamp-1 text-gray-900 dark:text-gray-100">
-  {appointment.hospitalName}
-</h3>
-
-                                      <Badge className={`${color} text-white text-xs px-1.5 py-0.5`}>
-                                        {status === "upcoming" ? "Soon" : "Scheduled"}
-                                      </Badge>
-                                    </div>
-
-                                    <div className="text-xs space-y-1">
-                                      <div className="flex items-center text-foreground">
-                                        <User className="mr-1 h-3 w-3 text-muted-foreground" />
-                                        <span className="truncate">Dr. {appointment.doctorName}</span>
-                                      </div>
-                                      <div className="flex items-center text-foreground">
-                                        <Calendar className="mr-1 h-3 w-3 text-muted-foreground" />
-                                        {formatDateForMobile(appointment.date)}
-                                      </div>
-                                      <div className="flex items-center text-foreground">
-                                        <Clock className="mr-1 h-3 w-3 text-muted-foreground" />
-                                        {formatTimeForMobile(appointment.time)}
-                                      </div>
-                                    </div>
-                                  </div>
-
-                                  <div className="flex items-center space-x-1 ml-2">
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      onClick={() => handleGetDirections(appointment)}
-                                      className="h-7 w-7 text-muted-foreground"
-                                      title="Directions"
-                                    >
-                                      <Navigation className="h-3.5 w-3.5" />
-                                    </Button>
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      onClick={() => handleEditAppointment(appointment)}
-                                      className="h-7 w-7 text-muted-foreground"
-                                      title="Edit"
-                                    >
-                                      <Edit className="h-3.5 w-3.5" />
-                                    </Button>
-                                  </div>
-                                </div>
-
-                                {appointment.notes && (
-                                  <div className="mt-2 p-2 bg-muted rounded text-xs line-clamp-2">
-                                    {appointment.notes}
-                                  </div>
-                                )}
-
-                                <div className="mt-2 flex justify-end">
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => appointment.id && handleDeleteAppointment(appointment.id)}
-                                    className="text-xs h-7 text-red-500 hover:text-red-600 px-2"
-                                  >
-                                    <Trash2 className="mr-1 h-3.5 w-3.5" />
-                                    Delete
-                                  </Button>
-                                </div>
-                              </CardContent>
-                            </Card>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Past Appointments - Compact mobile cards */}
-                  {pastAppointments.length > 0 && (
-                    <div>
-                      <h2 className="text-base font-semibold mb-2">Past Appointments</h2>
-                      <div className="space-y-2">
-                        {pastAppointments.slice(0, 3).map((appointment) => (
-                          <Card key={appointment.id} className="bg-card border-border rounded-lg shadow-sm opacity-80">
-                            <CardContent className="p-3">
-                              <div className="flex justify-between items-center">
-                                <div className="truncate">
-                                  <div className="flex items-center space-x-1">
-                                    <h3 className="font-medium text-sm truncate text-gray-900 dark:text-gray-100">
-                                        {appointment.hospitalName}
-                                    </h3>
-
-                                    <Badge className="bg-green-600 text-white text-xs px-1.5 py-0.5">
-                                      Done
-                                    </Badge>
-                                  </div>
-                                  <div className="text-xs text-muted-foreground truncate">
-                                    Dr. {appointment.doctorName} • {formatDateForMobile(appointment.date)}
-                                  </div>
-                                </div>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => appointment.id && handleDeleteAppointment(appointment.id)}
-                                  className="h-7 w-7 text-red-500"
-                                  title="Delete"
-                                >
-                                  <Trash2 className="h-3.5 w-3.5" />
-                                </Button>
+          {/* Appointments Content */}
+          {loading ? (
+            <div className="text-center py-10 text-muted-foreground">Loading appointments...</div>
+          ) : filteredAppointments.length === 0 ? (
+            <div className="text-center text-muted-foreground py-20">
+              <Calendar className="mx-auto mb-2 text-muted-foreground w-10 h-10" />
+              No appointments found. Try booking one!
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {upcomingAppointments.length > 0 && (
+                <section>
+                  <h3 className="text-lg font-semibold mb-2 text-[#a855f7] dark:text-[#a855f7]">Upcoming</h3>
+                  {upcomingAppointments.map((apt) => {
+                    const { label, color } = getStatus(apt);
+                    return (
+                      <Card key={apt.id} className="bg-card border-border rounded-lg mt-4 shadow-md">
+                        <CardContent className="p-4">
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <div className="flex items-center gap-2 mb-1">
+                                <h4 className="text-foreground font-semibold text-base">{apt.hospitalName}</h4>
+                                <Badge className={`${color} text-white text-xs`}>{label}</Badge>
                               </div>
-                            </CardContent>
-                          </Card>
-                        ))}
-                      </div>
-                      {pastAppointments.length > 3 && (
-                        <div className="text-center text-xs text-muted-foreground mt-1">
-                          + {pastAppointments.length - 3} more
+                              <p className="text-muted-foreground text-sm">
+                                Dr. {apt.doctorName} • {formatDate(apt.date)} @ {formatTime(apt.time)}
+                              </p>
+                            </div>
+                            <div className="flex gap-2">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleDirections(apt)}
+                                className="text-muted-foreground hover:text-teal-300 dark:hover:text-teal-500"
+                                title="Directions"
+                              >
+                                <Navigation className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => {
+                                  setEditingAppointment(apt);
+                                  setDialogOpen(true);
+                                }}
+                                className="text-muted-foreground hover:text-teal-300 dark:hover:text-teal-500"
+                                title="Edit"
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </div>
+                          {apt.notes && (
+                            <div className="mt-2 bg-muted text-muted-foreground p-2 rounded text-sm">
+                              Note: {apt.notes}
+                            </div>
+                          )}
+                          <div className="mt-2 flex justify-end">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-red-500 dark:text-red-600 text-xs"
+                              onClick={() =>
+                                apt.id &&
+                                deleteAppointment(apt.id)
+                                  .then(() => toast.success("Appointment deleted successfully"))
+                                  .catch(() => toast.error("Failed to delete appointment"))
+                              }
+                            >
+                              <Trash2 className="h-4 w-4 mr-1" /> Delete
+                            </Button>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </section>
+              )}
+
+              {pastAppointments.length > 0 && (
+                <section>
+                  <h3 className="text-lg font-semibold mb-2 text-muted-foreground">Past Appointments</h3>
+                  {pastAppointments.slice(0, 3).map((apt) => (
+                    <Card key={apt.id} className="bg-card border-border mt-4 rounded-lg opacity-70">
+                      <CardContent className="p-4 flex justify-between items-center">
+                        <div>
+                          <h4 className="text-foreground font-semibold">{apt.hospitalName}</h4>
+                          <p className="text-muted-foreground text-sm">
+                            Dr. {apt.doctorName} • {formatDate(apt.date)}
+                          </p>
                         </div>
-                      )}
-                    </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() =>
+                            apt.id &&
+                            deleteAppointment(apt.id)
+                              .then(() => toast.success("Appointment deleted successfully"))
+                              .catch(() => toast.error("Failed to delete appointment"))
+                          }
+                          className="text-red-500 dark:text-red-600"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  ))}
+                  {pastAppointments.length > 10 && (
+                    <p className="text-center text-muted-foreground mt-2">
+                      + {pastAppointments.length - 3} more
+                    </p>
                   )}
-                </div>
-              ) : (
-                /* Mobile empty state */
-                <div className="bg-card border-border rounded-lg p-4 text-center shadow-sm mt-4">
-                  <div className="w-10 h-10 bg-muted rounded-full flex items-center justify-center mx-auto mb-3">
-                    <Calendar className="h-4 w-4 text-muted-foreground" />
-                  </div>
-                  <h3 className="text-base font-semibold mb-1">
-                    No appointments
-                  </h3>
-                  <p className="text-muted-foreground mb-3 text-xs">
-                    Book your first medical appointment
-                  </p>
-                  <Button
-                    onClick={handleAddAppointment}
-                    size="sm"
-                    className="bg-purple-600 hover:bg-purple-700 text-white rounded-lg h-9 px-3 text-xs"
-                  >
-                    <Plus className="mr-1 h-3.5 w-3.5" />
-                    Book Now
-                  </Button>
-                </div>
+                </section>
               )}
             </div>
-          </div>
+          )}
         </div>
       </div>
     </AuthGuard>

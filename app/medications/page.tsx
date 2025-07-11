@@ -1,4 +1,3 @@
-
 "use client";
 
 import type React from "react";
@@ -7,7 +6,7 @@ import Image from "next/image";
 import { Sidebar } from "@/components/sidebar";
 import { AuthGuard } from "@/components/auth-guard";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -25,8 +24,8 @@ import {
   type Medication,
 } from "@/lib/firestore";
 import { toast } from "sonner";
-import { db } from "@/lib/firebase";
 import { doc, getDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 export default function MedicationsPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -45,8 +44,17 @@ export default function MedicationsPage() {
     enableWhatsApp: false,
     phoneNumber: "",
   });
+  const [search, setSearch] = useState("");
+  const [isMobile, setIsMobile] = useState(false);
   const { user } = useAuth();
   const reminderTimeouts = useRef<Map<string, NodeJS.Timeout>>(new Map());
+
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
 
   const sendMobileNotification = async (userId: string, title: string, body: string) => {
     try {
@@ -167,6 +175,20 @@ export default function MedicationsPage() {
     };
   }, [user]);
 
+  // Enhanced search functionality
+  const filteredMedications = medications.filter((med) =>
+    [
+      med.name,
+      med.dosage,
+      med.frequency,
+      med.notes || "",
+      med.phoneNumber || "",
+      med.startDate,
+      med.endDate || "",
+      ...med.reminderTimes,
+    ].some((field) => field.toLowerCase().includes(search.toLowerCase().trim()))
+  );
+
   const resetForm = () => {
     setFormData({
       name: "",
@@ -270,7 +292,7 @@ export default function MedicationsPage() {
         const medication = medications.find((m) => m.id === medicationId);
         const notifications = [
           sendMobileNotification(user.uid, "Medication Delete Error", `Failed to delete medication: ${errorMessage}`),
-          user.email ? sendEmailNotification(user.email, "Medication Delete Error", `Failed to save medication: ${errorMessage}`) : Promise.resolve(),
+          user.email ? sendEmailNotification(user.email, "Medication Delete Error", `Failed to delete medication: ${errorMessage}`) : Promise.resolve(),
         ];
         if (medication?.enableWhatsApp && medication.phoneNumber) {
           notifications.push(Promise.resolve(sendMedicationReminder(user.uid, medication.name, medication.phoneNumber, true)));
@@ -335,43 +357,56 @@ export default function MedicationsPage() {
     }
   };
 
+  const formatDate = (date: string) => {
+    const d = new Date(date);
+    return isMobile
+      ? d.toLocaleDateString("en-US", { month: "short", day: "numeric" })
+      : d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+  };
+
+  const formatTime = (time: string) => (isMobile ? time.replace(/:00$/, "") : time);
+
   return (
     <AuthGuard>
-      <div className="bg-background text-foreground min-h-screen flex h-screen overflow-hidden">
+      <div className="flex min-h-screen bg-white dark:bg-[#0e1a2b] text-black dark:text-white">
         <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+        <div className="flex-1 overflow-y-auto px-4 pt-10 max-w-5xl mx-auto">
+          {/* Header without Theme Toggle */}
+          <div className="text-center mb-8">
+            <h1 className="text-3xl font-bold text-[#a855f7]">Manage Your Medications</h1>
+            <p className="text-muted-foreground mt-1 mb-6">Track your medications and set reminders</p>
+          </div>
 
-        <div className="flex-1 flex flex-col">
-          <div className="flex items-center justify-between p-3 sm:p-4 border-b border-border bg-card">
-            <div className="flex items-center space-x-3">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setSidebarOpen(!sidebarOpen)}
-                className="text-muted-foreground hover:text-foreground lg:hidden h-10 w-10"
-                aria-label="Toggle sidebar"
-              >
-                <Menu className="h-5 w-5" />
-              </Button>
-              <div className="w-8 h-8 relative">
-                <Image src="/logo.png" alt="Medibot Logo" width={32} height={32} className="rounded-full" />
-              </div>
-              <span className="font-semibold text-lg">Medications</span>
+          {/* Search Bar */}
+          <div className="relative max-w-2xl mx-auto mb-8">
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search by medication, dosage, frequency, or notes..."
+              className="w-full pl-10 pr-4 py-3 rounded-full bg-card text-foreground placeholder-muted-foreground border border-border focus:outline-none focus:ring-2 focus:ring-teal-500"
+            />
+            <div className="absolute top-1/2 left-3 transform -translate-y-1/2 text-muted-foreground">
+              <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35m1.62-5.88a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
             </div>
+          </div>
 
+          {/* Medications Header */}
+          <div className="flex justify-between items-center mt-10 mb-4">
+            <h2 className="text-xl font-semibold text-foreground">Your Medications</h2>
             <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
               <DialogTrigger asChild>
                 <Button
                   onClick={handleAddMedication}
-                  className="bg-purple-600 hover:bg-purple-700 text-white rounded-lg h-10 px-4 sm:px-6 text-sm transform hover:scale-105 transition-transform duration-200"
+                  className="bg-[#a855f7] hover:bg-teal-600 dark:bg-[#a855f7] dark:hover:bg-teal-600 text-white rounded-lg text-sm px-4 py-2"
                 >
-                  <Plus className="mr-2 h-4 w-4" />
-                  <span className="hidden sm:inline">Add Medication</span>
-                  <span className="sm:hidden">Add</span>
+                  <Plus className="mr-1 h-4 w-4" /> Add
                 </Button>
               </DialogTrigger>
-              <DialogContent className="bg-card border-border text-foreground max-w-[90vw] sm:max-w-md mx-auto max-h-[90vh] overflow-y-auto rounded-xl shadow p-4 sm:p-6">
+              <DialogContent className="bg-card text-foreground border-border max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
-                  <DialogTitle className="text-lg">{editingMedication ? "Edit Medication" : "Add New Medication"}</DialogTitle>
+                  <DialogTitle>{editingMedication ? "Edit" : "New"} Medication</DialogTitle>
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <div>
@@ -380,7 +415,7 @@ export default function MedicationsPage() {
                       id="name"
                       value={formData.name}
                       onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                      className="bg-muted border-border text-foreground focus:outline-none focus:ring-2 focus:ring-purple-600"
+                      className="bg-card border-border text-foreground focus:outline-none focus:ring-2 focus:ring-teal-500"
                       required
                     />
                   </div>
@@ -393,7 +428,7 @@ export default function MedicationsPage() {
                         value={formData.dosage}
                         onChange={(e) => setFormData({ ...formData, dosage: e.target.value })}
                         placeholder="e.g., 500mg"
-                        className="bg-muted border-border text-foreground focus:outline-none focus:ring-2 focus:ring-purple-600"
+                        className="bg-card border-border text-foreground focus:outline-none focus:ring-2 focus:ring-teal-500"
                         required
                       />
                     </div>
@@ -403,10 +438,10 @@ export default function MedicationsPage() {
                         value={formData.frequency}
                         onValueChange={(value) => setFormData({ ...formData, frequency: value })}
                       >
-                        <SelectTrigger className="bg-muted border-border text-foreground focus:outline-none focus:ring-2 focus:ring-purple-600">
+                        <SelectTrigger className="bg-card border-border text-foreground focus:outline-none focus:ring-2 focus:ring-teal-500">
                           <SelectValue placeholder="Select frequency" />
                         </SelectTrigger>
-                        <SelectContent className="bg-card border-border text-foreground shadow-lg">
+                        <SelectContent className="bg-card border-border text-foreground">
                           <SelectItem value="once-daily">Once daily</SelectItem>
                           <SelectItem value="twice-daily">Twice daily</SelectItem>
                           <SelectItem value="three-times-daily">Three times daily</SelectItem>
@@ -425,7 +460,7 @@ export default function MedicationsPage() {
                         type="date"
                         value={formData.startDate}
                         onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-                        className="bg-muted border-border text-foreground focus:outline-none focus:ring-2 focus:ring-purple-600"
+                        className="bg-card border-border text-foreground focus:outline-none focus:ring-2 focus:ring-teal-500"
                         required
                       />
                     </div>
@@ -436,7 +471,7 @@ export default function MedicationsPage() {
                         type="date"
                         value={formData.endDate}
                         onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
-                        className="bg-muted border-border text-foreground focus:outline-none focus:ring-2 focus:ring-purple-600"
+                        className="bg-card border-border text-foreground focus:outline-none focus:ring-2 focus:ring-teal-500"
                       />
                     </div>
                   </div>
@@ -449,16 +484,16 @@ export default function MedicationsPage() {
                           type="time"
                           value={time}
                           onChange={(e) => updateReminderTime(index, e.target.value)}
-                          className="bg-muted border-border text-foreground flex-1 focus:outline-none focus:ring-2 focus:ring-purple-600"
+                          className="bg-card border-border text-foreground flex-1 focus:outline-none focus:ring-2 focus:ring-teal-500"
                           placeholder="HH:MM"
                         />
                         {formData.reminderTimes.length > 1 && (
                           <Button
                             type="button"
-                            variant="outline"
+                            variant="ghost"
                             size="icon"
                             onClick={() => removeReminderTime(index)}
-                            className="border-border text-muted-foreground hover:text-foreground hover:bg-muted h-10 w-10"
+                            className="text-muted-foreground hover:text-teal-300 dark:hover:text-teal-500"
                             aria-label="Remove reminder time"
                           >
                             <Trash2 className="h-4 w-4" />
@@ -468,9 +503,9 @@ export default function MedicationsPage() {
                     ))}
                     <Button
                       type="button"
-                      variant="outline"
+                      variant="ghost"
                       onClick={addReminderTime}
-                      className="mt-2 border-border bg-muted text-foreground hover:bg-purple-600 hover:text-white rounded-lg"
+                      className="mt-2 text-muted-foreground hover:text-teal-300 dark:hover:text-teal-500"
                     >
                       <Plus className="mr-2 h-4 w-4" />
                       Add Reminder Time
@@ -497,7 +532,7 @@ export default function MedicationsPage() {
                           value={formData.phoneNumber}
                           onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })}
                           placeholder="e.g., +1234567890"
-                          className="bg-muted border-border text-foreground focus:outline-none focus:ring-2 focus:ring-purple-600"
+                          className="bg-card border-border text-foreground focus:outline-none focus:ring-2 focus:ring-teal-500"
                           required={formData.enableWhatsApp}
                         />
                       </div>
@@ -511,22 +546,22 @@ export default function MedicationsPage() {
                       value={formData.notes}
                       onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                       placeholder="Additional notes..."
-                      className="bg-muted border-border text-foreground focus:outline-none focus:ring-2 focus:ring-purple-600"
+                      className="bg-card border-border text-foreground focus:outline-none focus:ring-2 focus:ring-teal-500"
                     />
                   </div>
 
                   <div className="flex space-x-3 pt-4">
                     <Button
                       type="button"
-                      variant="outline"
+                      variant="ghost"
                       onClick={() => setDialogOpen(false)}
-                      className="flex-1 border-border text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg"
+                      className="flex-1 text-muted-foreground hover:text-teal-300 dark:hover:text-teal-500"
                     >
                       Cancel
                     </Button>
                     <Button
                       type="submit"
-                      className="flex-1 bg-purple-600 hover:bg-purple-700 text-white rounded-lg"
+                      className="flex-1 bg-[#a855f7] hover:bg-teal-600 dark:bg-[#a855f7] dark:hover:bg-teal-600 text-white"
                     >
                       {editingMedication ? "Update" : "Add"} Medication
                     </Button>
@@ -536,138 +571,104 @@ export default function MedicationsPage() {
             </Dialog>
           </div>
 
-          <div className="flex-1 p-4 sm:p-6 overflow-y-auto">
-            <div className="max-w-4xl mx-auto">
-              <div className="mb-6 sm:mb-8">
-                <h1 className="text-2xl sm:text-3xl font-semibold">Stay on Track with Your Meds</h1>
-                <p className="text-muted-foreground text-sm">Manage your Medications and set reminders</p>
-              </div>
-
-              {loading ? (
-                <div className="text-center py-12">
-                  <div className="w-8 h-8 border-4 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-                  <p className="text-muted-foreground text-sm">Loading medications...</p>
-                </div>
-              ) : medications.length > 0 ? (
-               <div className="grid gap-6 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-2">
-  {medications.map((medication) => (
-    <div
-      key={medication.id}
-      className="rounded-2xl border border-border bg-muted/30 backdrop-blur-md p-5 shadow-md hover:shadow-xl hover:scale-[1.01] transition-all duration-300"
-    >
-      <div className="flex justify-between items-start mb-4">
-        <div>
-          <h2 className="text-xl font-semibold flex items-center gap-2">
-            {medication.name}
-            {medication.enableWhatsApp && (
-              <Badge
-                title="WhatsApp Reminders Enabled"
-                className="bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded-full"
-              >
-                WhatsApp
-              </Badge>
-            )}
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            {medication.dosage} • {medication.frequency}
-          </p>
-        </div>
-        <div className="flex items-center gap-2 text-muted-foreground">
-          {medication.reminderTimes.length > 0 && (
-            <Button
-              size="icon"
-              variant="ghost"
-              onClick={() => testReminder(medication)}
-              className="hover:text-green-600"
-              title="Test Reminder"
-            >
-              <Bell className="w-4 h-4" />
-            </Button>
-          )}
-          <Button
-            size="icon"
-            variant="ghost"
-            onClick={() => handleEditMedication(medication)}
-            className="hover:text-purple-600"
-            title="Edit"
-          >
-            <Edit className="w-4 h-4" />
-          </Button>
-          <Button
-            size="icon"
-            variant="ghost"
-            onClick={() => medication.id && handleDeleteMedication(medication.id)}
-            className="hover:text-red-600"
-            title="Delete"
-          >
-            <Trash2 className="w-4 h-4" />
-          </Button>
-        </div>
-      </div>
-
-      <div className="flex flex-wrap gap-3 text-sm text-muted-foreground mb-3">
-        <Badge className="bg-muted text-muted-foreground rounded-full px-3 py-1 flex items-center gap-1">
-          <Clock className="w-3 h-3" /> {medication.startDate}
-        </Badge>
-        {medication.endDate && (
-          <Badge className="bg-muted text-muted-foreground rounded-full px-3 py-1 flex items-center gap-1">
-            <Clock className="w-3 h-3" /> Until {medication.endDate}
-          </Badge>
-        )}
-        {medication.phoneNumber && (
-          <Badge className="bg-muted text-muted-foreground rounded-full px-3 py-1 flex items-center gap-1">
-            <Phone className="w-3 h-3" /> {medication.phoneNumber}
-          </Badge>
-        )}
-      </div>
-
-      {medication.reminderTimes.length > 0 && (
-        <div className="mb-3">
-          <p className="text-sm text-muted-foreground mb-1">Reminder times:</p>
-          <div className="flex flex-wrap gap-2">
-            {medication.reminderTimes.map((time, index) => (
-              <Badge
-                key={index}
-                className="bg-purple-600 text-white rounded-full px-3 py-1 text-xs font-medium flex items-center gap-1"
-              >
-                <Clock className="w-3 h-3" />
-                {time}
-              </Badge>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {medication.notes && (
-        <div className="bg-muted px-4 py-3 rounded-lg text-sm text-foreground border border-border">
-          {medication.notes}
-        </div>
-      )}
-    </div>
-  ))}
-</div>
-
-              ) : (
-                <div className="bg-muted/20 border border-dashed border-border rounded-2xl p-8 sm:p-12 text-center shadow-lg backdrop-blur-md">
-
-                  <div className="w-16 h-16 sm:w-20 sm:h-20 bg-muted rounded-full flex items-center justify-center mx-auto mb-6 sm:mb-8">
-                    <Pill className="h-8 w-8 sm:h-10 sm:w-10 text-muted-foreground" />
-                  </div>
-                  <h3 className="text-xl sm:text-2xl font-semibold mb-3 sm:mb-4">No medications added</h3>
-                  <p className="text-muted-foreground mb-6 sm:mb-8 max-w-md mx-auto text-sm sm:text-base">
-                    Add your medications to track doses and set reminders
-                  </p>
-                  <Button
-                    onClick={handleAddMedication}
-                    className="bg-purple-600 hover:bg-purple-700 text-white rounded-lg h-12 px-6 sm:px-8 font-semibold text-sm sm:text-base"
-                  >
-                    <Plus className="mr-2 h-4 w-4 sm:h-5 sm:w-5" />
-                    Add Your First Medication
-                  </Button>
-                </div>
-              )}
+          {/* Medications Content */}
+          {loading ? (
+            <div className="text-center py-10 text-muted-foreground">Loading medications...</div>
+          ) : filteredMedications.length === 0 ? (
+            <div className="text-center text-muted-foreground py-20">
+              <Pill className="mx-auto mb-2 text-muted-foreground w-10 h-10" />
+              No medications found. Try adding one or adjusting your search!
             </div>
-          </div>
+          ) : (
+            <div className="space-y-6">
+              <section>
+                <h3 className="text-lg font-semibold mb-2 text-[#a855f7] dark:text-[#a855f7]">Active Medications</h3>
+                {filteredMedications.map((medication) => (
+                  <Card key={medication.id} className="bg-card border-border rounded-lg mt-4 shadow-md">
+                    <CardContent className="p-4">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <div className="flex items-center gap-2 mb-1">
+                            <h4 className="text-foreground font-semibold text-base">{medication.name}</h4>
+                            {medication.enableWhatsApp && (
+                              <Badge className="bg-green-600 dark:bg-green-500 text-white text-xs">WhatsApp</Badge>
+                            )}
+                          </div>
+                          <p className="text-muted-foreground text-sm">
+                            {medication.dosage} • {medication.frequency} • {formatDate(medication.startDate)}
+                            {medication.endDate && ` - ${formatDate(medication.endDate)}`}
+                          </p>
+                        </div>
+                        <div className="flex gap-2">
+                          {medication.reminderTimes.length > 0 && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => testReminder(medication)}
+                              className="text-muted-foreground hover:text-teal-300 dark:hover:text-teal-500"
+                              title="Test Reminder"
+                            >
+                              <Bell className="h-4 w-4" />
+                            </Button>
+                          )}
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleEditMedication(medication)}
+                            className="text-muted-foreground hover:text-teal-300 dark:hover:text-teal-500"
+                            title="Edit"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => medication.id && handleDeleteMedication(medication.id)}
+                            className="text-red-500 dark:text-red-600"
+                            title="Delete"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                      {medication.reminderTimes.length > 0 && (
+                        <div className="mt-2">
+                          <p className="text-sm text-muted-foreground mb-1">Reminder Times:</p>
+                          <div className="flex flex-wrap gap-2">
+                            {medication.reminderTimes.map((time, index) => (
+                              <Badge key={index} className="bg-blue-600 dark:bg-blue-500 text-white text-xs">
+                                {formatTime(time)}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {medication.notes && (
+                        <div className="mt-2 bg-muted text-muted-foreground p-2 rounded text-sm">
+                          Note: {medication.notes}
+                        </div>
+                      )}
+                      {medication.phoneNumber && (
+                        <div className="mt-2 text-muted-foreground text-sm">
+                          Phone: {medication.phoneNumber}
+                        </div>
+                      )}
+                      <div className="mt-2 flex justify-end">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-red-500 dark:text-red-600 text-xs"
+                          onClick={() => medication.id && handleDeleteMedication(medication.id)}
+                        >
+                          <Trash2 className="h-4 w-4 mr-1" /> Delete
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </section>
+            </div>
+          )}
         </div>
       </div>
     </AuthGuard>
