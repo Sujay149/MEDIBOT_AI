@@ -60,7 +60,13 @@ import { toast } from "sonner";
 import Link from "next/link";
 import { debounce } from "lodash";
 import firebase from "firebase/firestore";
-
+import { loadStripe } from '@stripe/stripe-js';
+import {
+  Elements,
+  CardElement,
+  useStripe,
+  useElements,
+} from '@stripe/react-stripe-js';
 declare global {
   interface Window {
     puter: any;
@@ -110,6 +116,209 @@ interface GeminiResponse {
     };
   }>;
 }
+const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
+
+const PaymentForm = ({ plan, onSuccess, onCancel }: { 
+  plan: string, 
+  onSuccess: () => void, 
+  onCancel: () => void 
+}) => {
+  const stripe = useStripe();
+  const elements = useElements();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!stripe || !elements) return;
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      // Create payment intent on your backend
+      const response = await fetch('/api/create-payment-intent', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          plan,
+          amount: plan === 'premium' ? 999 : 499, // $9.99 or $4.99
+          currency: 'usd',
+        }),
+      });
+
+      const { clientSecret } = await response.json();
+
+      const { error: stripeError, paymentIntent } = await stripe.confirmCardPayment(
+        clientSecret,
+        {
+          payment_method: {
+            card: elements.getElement(CardElement)!,
+          },
+        }
+      );
+
+      if (stripeError) {
+        setError(stripeError.message || 'Payment failed');
+      } else if (paymentIntent.status === 'succeeded') {
+        onSuccess();
+      }
+    } catch (err) {
+      setError('Payment processing failed. Please try again.');
+      console.error('Payment error:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <CardElement 
+        options={{
+          style: {
+            base: {
+              fontSize: '16px',
+              color: '#424770',
+              '::placeholder': {
+                color: '#aab7c4',
+              },
+            },
+            invalid: {
+              color: '#9e2146',
+            },
+          },
+        }}
+      />
+      
+      {error && <p className="text-red-500 text-sm">{error}</p>}
+      
+      <div className="flex space-x-3 pt-2">
+        <Button
+          type="button"
+          onClick={onCancel}
+          variant="outline"
+          className="flex-1"
+        >
+          Cancel
+        </Button>
+        <Button
+          type="submit"
+          disabled={!stripe || loading}
+          className="flex-1 bg-purple-600 hover:bg-purple-700"
+        >
+          {loading ? 'Processing...' : `Pay $${plan === 'premium' ? '9.99' : '4.99'}`}
+        </Button>
+      </div>
+    </form>
+  );
+};
+
+const PaymentDialog = ({ 
+  open, 
+  onOpenChange, 
+  plan 
+}: { 
+  open: boolean, 
+  onOpenChange: (open: boolean) => void, 
+  plan: string 
+}) => {
+  const [paymentSuccess, setPaymentSuccess] = useState(false);
+
+  const handleSuccess = () => {
+    setPaymentSuccess(true);
+    setTimeout(() => {
+      onOpenChange(false);
+      setPaymentSuccess(false);
+    }, 2000);
+  };
+
+  return (
+   <Dialog open={open} onOpenChange={onOpenChange}>
+  <DialogContent className="max-w-md p-6 rounded-lg">
+    <DialogHeader>
+      <DialogTitle className="text-2xl font-bold text-gray-900 dark:text-white">
+        {paymentSuccess ? (
+          <div className="flex flex-col items-center gap-3">
+            <div className="flex items-center justify-center w-12 h-12 bg-green-100 dark:bg-green-900/30 rounded-full">
+              <CheckCircle className="h-6 w-6 text-green-600 dark:text-green-400" />
+            </div>
+            <span className="text-center">Payment Successful!</span>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-1">
+            <span>Upgrade to {plan === 'premium' ? 'Premium' : 'Base'} Plan</span>
+            <span className="text-sm font-normal text-muted-foreground">
+              ${plan === 'premium' ? '9.99/month' : '4.99/month'}
+            </span>
+          </div>
+        )}
+      </DialogTitle>
+      <DialogDescription className="text-center text-gray-600 dark:text-gray-400">
+        {paymentSuccess
+          ? 'Your subscription is now active. You can start using premium features immediately.'
+          : 'Secure payment processed by Stripe. Your financial information is encrypted.'}
+      </DialogDescription>
+    </DialogHeader>
+
+    {paymentSuccess ? (
+      <div className="flex flex-col items-center gap-4 py-4">
+        <div className="w-full max-w-[200px]">
+          <svg viewBox="0 0 200 100" className="w-full h-auto">
+            <path
+              d="M20,50 Q50,20 80,50 T140,50"
+              fill="none"
+              stroke="#10B981"
+              strokeWidth="4"
+              strokeDasharray="0"
+              className="animate-drawLine"
+            />
+          </svg>
+        </div>
+        <Button
+          onClick={() => onOpenChange(false)}
+          className="w-full bg-green-600 hover:bg-green-700 text-white"
+        >
+          Continue to App
+        </Button>
+      </div>
+    ) : (
+      <Elements stripe={stripePromise}>
+        <div className="space-y-4">
+          <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+            <div className="flex justify-between items-center">
+              <span className="font-medium">Plan</span>
+              <span className="font-semibold">
+                {plan === 'premium' ? 'Premium' : 'Base'}
+              </span>
+            </div>
+            <div className="flex justify-between items-center mt-2">
+              <span className="font-medium">Price</span>
+              <span className="font-semibold">
+                ${plan === 'premium' ? '9.99' : '4.99'}
+                <span className="text-sm text-gray-500"> / month</span>
+              </span>
+            </div>
+          </div>
+
+          <PaymentForm 
+            plan={plan} 
+            onSuccess={handleSuccess} 
+            onCancel={() => onOpenChange(false)} 
+          />
+
+          <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+            /
+            <span>Payments are secure and encrypted</span>
+          </div>
+        </div>
+      </Elements>
+    )}
+  </DialogContent>
+</Dialog>
+  );
+};
 
 function ChatContent() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -137,7 +346,8 @@ function ChatContent() {
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
-
+const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
+const [selectedPlanForPayment, setSelectedPlanForPayment] = useState('base');
   // Initialize Speech Recognition
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -1215,44 +1425,42 @@ function ChatContent() {
     </Button>
 
     {/* Plan Selector */}
-    <Select 
-      value={selectedPlan} 
-      onValueChange={(value) => {
-        setSelectedPlan(value);
-        if (value === "base") {
-          window.location.href = "https://x.ai/grok";
-        } else if (value === "premium") {
-          window.location.href = "https://help.x.com/en/using-x/x-premium";
-        }
-      }}
+   // Replace your existing Select component with this:
+<Select 
+  value={selectedPlan} 
+  onValueChange={(value) => {
+    setSelectedPlan(value);
+    setSelectedPlanForPayment(value);
+    setPaymentDialogOpen(true);
+  }}
+>
+  <SelectTrigger className="h-9 bg-gray-100 dark:bg-gray-700 text-sm font-medium text-gray-800 dark:text-gray-200 border border-gray-200 dark:border-gray-600 rounded-full px-4 hover:bg-gray-200/50 dark:hover:bg-gray-600/50">
+    <div className="flex items-center space-x-2">
+      {selectedPlan === "premium" ? (
+        <Crown className="h-4 w-4 text-yellow-500" />
+      ) : (
+        <Sparkles className="h-4 w-4 text-blue-500" />
+      )}
+      <SelectValue placeholder="Select Plan" />
+    </div>
+  </SelectTrigger>
+  <SelectContent className="bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 w-[240px]">
+    <SelectItem 
+      value="base" 
+      className="flex items-center gap-2 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700"
     >
-      <SelectTrigger className="h-9 bg-gray-100 dark:bg-gray-700 text-sm font-medium text-gray-800 dark:text-gray-200 border border-gray-200 dark:border-gray-600 rounded-full px-4 hover:bg-gray-200/50 dark:hover:bg-gray-600/50">
-        <div className="flex items-center space-x-2">
-          {selectedPlan === "premium" ? (
-            <Crown className="h-4 w-4 text-yellow-500" />
-          ) : (
-            <Sparkles className="h-4 w-4 text-blue-500" />
-          )}
-          <SelectValue placeholder="Select Plan" />
-        </div>
-      </SelectTrigger>
-      <SelectContent className="bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 w-[240px]">
-        <SelectItem 
-          value="base" 
-          className="flex items-center gap-2 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700"
-        >
-          <Sparkles className="h-4 w-4 text-blue-500" />
-          Base Plan
-        </SelectItem>
-        <SelectItem 
-          value="premium" 
-          className="flex items-center gap-2 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700"
-        >
-          <Crown className="h-4 w-4 text-yellow-500" />
-          Premium Plan
-        </SelectItem>
-      </SelectContent>
-    </Select>
+      <Sparkles className="h-4 w-4 text-blue-500" />
+      Base Plan ($4.99/month)
+    </SelectItem>
+    <SelectItem 
+      value="premium" 
+      className="flex items-center gap-2 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700"
+    >
+      <Crown className="h-4 w-4 text-yellow-500" />
+      Premium Plan ($9.99/month)
+    </SelectItem>
+  </SelectContent>
+</Select>
 
     {/* Title */}
     <h1 className="text-xl font-bold text-gray-800 dark:text-white">
@@ -1265,6 +1473,11 @@ function ChatContent() {
   <div className="flex items-center space-x-2">
     {user ? (
       <>
+      <PaymentDialog 
+  open={paymentDialogOpen} 
+  onOpenChange={setPaymentDialogOpen} 
+  plan={selectedPlanForPayment} 
+/>
         <Button
           onClick={startNewChat}
           variant="ghost"
