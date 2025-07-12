@@ -90,14 +90,6 @@ interface ProcessedChatSession extends Omit<ChatSession, "createdAt" | "updatedA
   }>;
 }
 
-interface GroqResponse {
-  choices: Array<{
-    message: {
-      content: string;
-    };
-  }>;
-}
-
 interface GeminiResponse {
   candidates: Array<{
     content: {
@@ -127,7 +119,7 @@ function ChatContent() {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [displayedResponse, setDisplayedResponse] = useState<{ [messageId: string]: string }>({});
   const [isTyping, setIsTyping] = useState<{ [messageId: string]: boolean }>({});
-  const [selectedPlan, setSelectedPlan] = useState<string>("base"); // Added state for plan selection
+  const [selectedPlan, setSelectedPlan] = useState<string>("base");
   const { user, userProfile } = useAuth();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -192,7 +184,7 @@ function ChatContent() {
       script.onload = () => console.log("Puter.js loaded");
       script.onerror = () => {
         console.error("Failed to load Puter.js");
-        toast.error("Failed to load AI service. Falling back to MediBot model.");
+        toast.error("Failed to load AI service. Using Gemini model.");
       };
       document.head.appendChild(script);
     }
@@ -232,7 +224,7 @@ function ChatContent() {
         unsubscribe = subscribeToUserChatSessions(user.uid, (userSessions) => {
           const normalizedSessions = userSessions
             .map(normalizeSession)
-            .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime()); // Fixed syntax error
+            .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
           setSessions(normalizedSessions);
         });
 
@@ -294,7 +286,7 @@ function ChatContent() {
 
   const uploadImageToCloudinary = async (file: File): Promise<string | null> => {
     try {
-      const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME; // Fixed env variable
+      const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
       if (!cloudName) {
         throw new Error("Cloudinary cloud name is not configured.");
       }
@@ -454,7 +446,7 @@ function ChatContent() {
           <>
             Rate limit reached. Try again later or{" "}
             <Link href="https://console.groq.com/docs/pricing" className="underline">
-              upgrade your Groq plan
+              upgrade your plan
             </Link>{" "}
             for higher usage quotas.
           </>
@@ -675,17 +667,18 @@ function ChatContent() {
     }
   };
 
-  const generateAIResponse = async (userMessage: string, selectedModel: string): Promise<string> => { // Fixed constD to const
+  const generateAIResponse = async (userMessage: string, selectedModel: string): Promise<string> => {
     try {
       const modelMap: Record<string, string> = {
         "gemini-2.0-flash": "gemini-2.0-flash",
-        "grok": "x-ai/grok-3-beta",
         "gpt-4o": "gpt-4o",
-        "medibot": "llama-3.3-70b-versatile",
+        // Removed "grok" and "medibot" to avoid Groq API key usage
       };
 
       const resolvedModel = modelMap[selectedModel];
-      if (!resolvedModel) throw new Error(`Invalid model: ${selectedModel}`);
+      if (!resolvedModel) {
+        throw new Error(`Model ${selectedModel} is not available. Please select another model.`);
+      }
 
       const recentMessages = currentSession?.messages
         .slice(-5)
@@ -694,62 +687,26 @@ function ChatContent() {
 
       const prompt = `You are MediBot, a health-focused AI assistant. Use the following conversation context to provide a concise, informative, and professional response. Ensure the response is educational, not a substitute for medical advice, and includes a reminder to consult a healthcare professional. Context: ${recentMessages}\n\nQuery: ${userMessage}`;
 
-      let response;
-      if (resolvedModel === "llama-3.3-70b-versatile") {
-        const groqApiKey = process.env.NEXT_PUBLIC_GROQ_API_KEY; // Fixed env variable
-        if (!groqApiKey) {
-          throw new Error("Groq API key is not configured.");
-        }
-
-        response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${groqApiKey}`,
-          },
-          body: JSON.stringify({
-            model: "llama-3.3-70b-versatile",
-            messages: [{ role: "user", content: prompt }],
-            max_tokens: 500,
-            temperature: 0.7,
-          }),
+      // Load Puter.js if not already loaded
+      if (typeof window !== "undefined" && !window.puter) {
+        await new Promise<void>((resolve, reject) => {
+          const script = document.createElement("script");
+          script.src = "https://js.puter.com/v2/";
+          script.async = true;
+          script.onload = () => resolve();
+          script.onerror = () => reject(new Error("Failed to load Puter.js"));
+          document.head.appendChild(script);
         });
-
-        if (!response.ok) {
-          throw new Error(`Groq API error: ${response.status}`);
-        }
-
-        const data = await response.json();
-        if (!data.choices?.[0]?.message?.content) {
-          throw new Error("No valid response from Groq API");
-        }
-        return data.choices[0].message.content.trim();
-      } else {
-        // Load Puter.js if not already loaded
-        if (typeof window !== "undefined" && !window.puter) {
-          await new Promise<void>((resolve, reject) => {
-            const script = document.createElement("script");
-            script.src = "https://js.puter.com/v2/";
-            script.async = true;
-            script.onload = () => resolve();
-            script.onerror = () => reject(new Error("Failed to load Puter.js"));
-            document.head.appendChild(script);
-          });
-        }
-
-        response = await window.puter.ai.chat(prompt, { model: resolvedModel });
-        if (!response?.message?.content) {
-          throw new Error("No valid response from AI service");
-        }
-        return response.message.content.trim();
       }
+
+      const response = await window.puter.ai.chat(prompt, { model: resolvedModel });
+      if (!response?.message?.content) {
+        throw new Error("No valid response from AI service");
+      }
+      return response.message.content.trim();
     } catch (error: any) {
       console.error("Error generating AI response:", error);
-      if (selectedModel !== "medibot") {
-        toast.warning("Primary model failed, falling back to MediBot model...");
-        return generateAIResponse(userMessage, "medibot");
-      }
-      return "I'm sorry, I couldn't process your request. Please try again or consult a healthcare professional.";
+      return `I'm sorry, I couldn't process your request with the selected model. Please try another model or consult a healthcare professional.`;
     }
   };
 
@@ -757,90 +714,54 @@ function ChatContent() {
     try {
       setAnalyzingPrescription(true);
       const fileBase64 = await fileToBase64(file);
-      const groqApiKey = process.env.NEXT_PUBLIC_GROQ_API_KEY; // Fixed env variable
-      const geminiApiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY; // Fixed env variable
 
-      if ((selectedModel === "medibot" || selectedModel === "grok") && !groqApiKey) {
-        throw new Error("Groq API key is not configured.");
-      }
-      if (selectedModel !== "medibot" && selectedModel !== "grok" && !geminiApiKey) {
+      const geminiApiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
+      if (!geminiApiKey) {
         throw new Error("Gemini API key is not configured.");
       }
 
-      const endpoint = selectedModel === "medibot"
-        ? "https://api.groq.com/openai/v1/chat/completions"
-        : selectedModel === "grok"
-        ? "https://api.x.ai/v1/models/grok:analyzePrescription"
-        : `https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:generateContent`;
+      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:generateContent`;
 
       const headers: Record<string, string> = {
         "Content-Type": "application/json",
       };
 
-      if (selectedModel === "medibot" || selectedModel === "grok") {
-        headers.Authorization = `Bearer ${groqApiKey}`;
-      }
-
-      const body = selectedModel === "medibot"
-        ? {
-            model: "llama-3.3-70b-versatile",
-            messages: [
+      const body = {
+        contents: [
+          {
+            parts: [
               {
-                role: "user",
-                content:
+                text:
                   "Analyze this prescription image or PDF and extract medications, dosages, instructions, and warnings. Return JSON with fields: medications (array), dosages (array), instructions (string), warnings (array).",
+              },
+              {
                 inlineData: {
                   mimeType: file.type,
                   data: fileBase64,
                 },
               },
             ],
-          }
-        : {
-            contents: [
-              {
-                parts: [
-                  {
-                    text:
-                      "Analyze this prescription image or PDF and extract medications, dosages, instructions, and warnings. Return JSON with fields: medications (array), dosages (array), instructions (string), warnings (array).",
-                  },
-                  {
-                    inlineData: {
-                      mimeType: file.type,
-                      data: fileBase64,
-                    },
-                  },
-                ],
-              },
-            ],
-            generationConfig: {
-              temperature: 0.5,
-              maxOutputTokens: 500,
-            },
-          };
+          },
+        ],
+        generationConfig: {
+          temperature: 0.5,
+          maxOutputTokens: 500,
+        },
+      };
 
-      const response = await fetch(
-        `${endpoint}${selectedModel === "medibot" || selectedModel === "grok" ? "" : `?key=${geminiApiKey}`}`,
-        {
-          method: "POST",
-          headers,
-          body: JSON.stringify(body),
-        }
-      );
+      const response = await fetch(`${endpoint}?key=${geminiApiKey}`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(body),
+      });
 
       if (!response.ok) {
         const errorText = await response.text();
         throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
       }
 
-      const data: GroqResponse | GeminiResponse = await response.json();
-      let responseText: string;
-
-      if (selectedModel === "medibot") {
-        responseText = (data as GroqResponse).choices?.[0]?.message?.content || "{}";
-      } else {
-        responseText = (data as GeminiResponse).candidates?.[0]?.content?.parts?.[0]?.text || "{}";
-      }
+      const data: GeminiResponse = await response.json();
+      const responseText = data.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
 
       // Clean and parse the response
       const cleanedResponseText = responseText.replace(/```json/g, "").replace(/```/g, "").replace(/`/g, "").trim();
@@ -866,11 +787,6 @@ function ChatContent() {
       };
     } catch (error: any) {
       console.error("Error analyzing prescription:", error);
-      if (selectedModel !== "medibot") {
-        toast.warning("Primary model failed for prescription analysis, falling back to MediBot model...");
-        setSelectedModel("medibot");
-        return analyzePrescription(file);
-      }
       toast.error(`Failed to analyze prescription: ${error.message || "Unknown error"}`);
       return {
         medications: ["Error"],
@@ -1208,7 +1124,7 @@ function ChatContent() {
               >
                 <Menu className="h-5 w-5" />
               </Button>
-              <Select value={selectedPlan} onValueChange={(value) => { // Fixed Select component
+              <Select value={selectedPlan} onValueChange={(value) => {
                 setSelectedPlan(value);
                 if (value === "base") {
                   window.location.href = "https://x.ai/grok";
@@ -1369,9 +1285,8 @@ function ChatContent() {
                         </SelectTrigger>
                         <SelectContent className="bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white text-sm border-none">
                           <SelectItem value="gemini-2.0-flash">Gemini 2.0 Flash</SelectItem>
-                          <SelectItem value="grok">Grok (Beta)</SelectItem>
                           <SelectItem value="gpt-4o">GPT-4o</SelectItem>
-                          <SelectItem value="medibot">MediBot</SelectItem>
+                          {/* Removed medibot and grok options */}
                         </SelectContent>
                       </Select>
                       <Button
