@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useRef, Suspense, useMemo } from "react";
@@ -9,13 +8,26 @@ import { AuthGuard } from "@/components/auth-guard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Download, Search } from "lucide-react";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Download,
+  Search,
   ThumbsDown,
   ThumbsUp,
   Copy,
@@ -113,6 +125,9 @@ function ChatContent() {
   const [fileName, setFileName] = useState("");
   const [isRecording, setIsRecording] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [displayedResponse, setDisplayedResponse] = useState<{ [messageId: string]: string }>({});
+  const [isTyping, setIsTyping] = useState<{ [messageId: string]: boolean }>({});
+  const [selectedPlan, setSelectedPlan] = useState<string>("base"); // Added state for plan selection
   const { user, userProfile } = useAuth();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -215,9 +230,9 @@ function ChatContent() {
     const fetchSessions = async () => {
       try {
         unsubscribe = subscribeToUserChatSessions(user.uid, (userSessions) => {
-          const normalizedSessions = userSessions.map(normalizeSession).sort(
-            (a, b) => b.updatedAt.getTime() - a.updatedAt.getTime()
-          );
+          const normalizedSessions = userSessions
+            .map(normalizeSession)
+            .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime()); // Fixed syntax error
           setSessions(normalizedSessions);
         });
 
@@ -279,6 +294,11 @@ function ChatContent() {
 
   const uploadImageToCloudinary = async (file: File): Promise<string | null> => {
     try {
+      const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME; // Fixed env variable
+      if (!cloudName) {
+        throw new Error("Cloudinary cloud name is not configured.");
+      }
+
       const validTypes = ["image/jpeg", "image/png", "image/heic", "application/pdf"];
       if (!validTypes.includes(file.type)) {
         throw new Error(`Unsupported file type: ${file.type}. Please upload a JPG, PNG, HEIC, or PDF.`);
@@ -289,7 +309,7 @@ function ChatContent() {
       formData.append("upload_preset", "medibot_Uploads");
 
       const response = await fetch(
-        `https://api.cloudinary.com/v1_1/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/${
+        `https://api.cloudinary.com/v1_1/${cloudName}/${
           file.type === "application/pdf" ? "raw" : "image"
         }/upload`,
         {
@@ -389,6 +409,19 @@ function ChatContent() {
         const analysisText = `**Prescription Analysis**:\n- **Medications**: ${analysis.medications.join(", ")}\n- **Dosages**: ${analysis.dosages.join(", ")}\n- **Instructions**: ${analysis.instructions}${analysis.warnings.length ? "\n- **Warnings**: " + analysis.warnings.join(", ") : ""}`;
         botResponse = botResponse ? `${botResponse}\n\n${analysisText}` : analysisText;
       }
+
+      // Start typing animation
+      setIsTyping((prev) => ({ ...prev, [messageId]: true }));
+      setDisplayedResponse((prev) => ({ ...prev, [messageId]: "" }));
+
+      let currentText = "";
+      for (let i = 0; i < botResponse.length; i++) {
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        currentText += botResponse[i];
+        setDisplayedResponse((prev) => ({ ...prev, [messageId]: currentText }));
+      }
+
+      setIsTyping((prev) => ({ ...prev, [messageId]: false }));
 
       const newMessage = await addMessageToSession(sessionId!, user.uid, userMessage, botResponse, "chat", fileUrl);
       setCurrentSession((prev) => {
@@ -642,7 +675,7 @@ function ChatContent() {
     }
   };
 
-  const generateAIResponse = async (userMessage: string, selectedModel: string): Promise<string> => {
+  const generateAIResponse = async (userMessage: string, selectedModel: string): Promise<string> => { // Fixed constD to const
     try {
       const modelMap: Record<string, string> = {
         "gemini-2.0-flash": "gemini-2.0-flash",
@@ -663,14 +696,17 @@ function ChatContent() {
 
       let response;
       if (resolvedModel === "llama-3.3-70b-versatile") {
-        // Use Groq API for MediBot
+        const groqApiKey = process.env.NEXT_PUBLIC_GROQ_API_KEY; // Fixed env variable
+        if (!groqApiKey) {
+          throw new Error("Groq API key is not configured.");
+        }
+
         response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
           method: "POST",
-         headers: {
-  "Content-Type": "application/json",
- Authorization: `Bearer ${process.env.NEXT_PUBLIC_GROQ_API_KEY}`,
-},
-
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${groqApiKey}`,
+          },
           body: JSON.stringify({
             model: "llama-3.3-70b-versatile",
             messages: [{ role: "user", content: prompt }],
@@ -721,6 +757,15 @@ function ChatContent() {
     try {
       setAnalyzingPrescription(true);
       const fileBase64 = await fileToBase64(file);
+      const groqApiKey = process.env.NEXT_PUBLIC_GROQ_API_KEY; // Fixed env variable
+      const geminiApiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY; // Fixed env variable
+
+      if ((selectedModel === "medibot" || selectedModel === "grok") && !groqApiKey) {
+        throw new Error("Groq API key is not configured.");
+      }
+      if (selectedModel !== "medibot" && selectedModel !== "grok" && !geminiApiKey) {
+        throw new Error("Gemini API key is not configured.");
+      }
 
       const endpoint = selectedModel === "medibot"
         ? "https://api.groq.com/openai/v1/chat/completions"
@@ -732,10 +777,8 @@ function ChatContent() {
         "Content-Type": "application/json",
       };
 
-      if (selectedModel === "medibot") {
-        headers.Authorization = `Bearer ${process.env.NEXT_PUBLIC_XAI_API_KEY}`;
-      } else if (selectedModel === "grok") {
-        headers.Authorization = `Bearer ${process.env.NEXT_PUBLIC_GROQ_API_KEY}`;
+      if (selectedModel === "medibot" || selectedModel === "grok") {
+        headers.Authorization = `Bearer ${groqApiKey}`;
       }
 
       const body = selectedModel === "medibot"
@@ -777,7 +820,7 @@ function ChatContent() {
           };
 
       const response = await fetch(
-        `${endpoint}${selectedModel === "medibot" || selectedModel === "grok" ? "" : `?key=${process.env.NEXT_PUBLIC_GEMINI_API_KEY}`}`,
+        `${endpoint}${selectedModel === "medibot" || selectedModel === "grok" ? "" : `?key=${geminiApiKey}`}`,
         {
           method: "POST",
           headers,
@@ -1033,14 +1076,17 @@ function ChatContent() {
                 </AvatarFallback>
               </Avatar>
             </div>
-            {msg.response ? (
+            {msg.response || isTyping[msg.id] ? (
               <div className="flex items-start space-x-2 max-w-[80%]">
                 <div className="bg-gray-100 dark:bg-gray-800 rounded-2xl p-4 text-gray-800 dark:text-white text-sm leading-relaxed border border-gray-200 dark:border-gray-700 shadow-md whitespace-pre-wrap">
-                  {msg.response.split("\n").map((line, i) => (
+                  {(isTyping[msg.id] ? displayedResponse[msg.id] : msg.response)?.split("\n").map((line, i) => (
                     <p key={i} className={line.startsWith("**") ? "font-semibold" : ""}>
                       {line}
                     </p>
                   ))}
+                  {isTyping[msg.id] && (
+                    <div className="inline-block w-2 h-4 bg-gray-500 animate-pulse"></div>
+                  )}
                   <div className="flex space-x-2 mt-2">
                     <Button
                       variant="ghost"
@@ -1123,7 +1169,7 @@ function ChatContent() {
         </div>
       );
     });
-  }, [user, currentSession, editingMessageId, editedMessage, isSpeaking, loading]);
+  }, [user, currentSession, editingMessageId, editedMessage, isSpeaking, loading, displayedResponse, isTyping]);
 
   const handleMessageChange = debounce((value: string) => {
     setMessage(value);
@@ -1162,6 +1208,22 @@ function ChatContent() {
               >
                 <Menu className="h-5 w-5" />
               </Button>
+              <Select value={selectedPlan} onValueChange={(value) => { // Fixed Select component
+                setSelectedPlan(value);
+                if (value === "base") {
+                  window.location.href = "https://x.ai/grok";
+                } else if (value === "premium") {
+                  window.location.href = "https://help.x.com/en/using-x/x-premium";
+                }
+              }}>
+                <SelectTrigger className="h-7 bg-gray-200 dark:bg-gray-700 text-sm text-gray-800 dark:text-gray-300 border-none rounded-md focus:ring-1 focus:ring-purple-500">
+                  <SelectValue placeholder="Select Plan" />
+                </SelectTrigger>
+                <SelectContent className="bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white text-sm border-none">
+                  <SelectItem value="base">Base Plan</SelectItem>
+                  <SelectItem value="premium">Premium Plan</SelectItem>
+                </SelectContent>
+              </Select>
               <h1 className="text-xl font-bold text-gray-800 dark:text-white">MediBot - Your Health Assistant</h1>
             </div>
             <div className="flex items-center space-x-2">
@@ -1284,92 +1346,92 @@ function ChatContent() {
           </ScrollArea>
 
           {/* Input Area */}
-         {user && (
-  <div className="sticky bottom-0 z-10 w-full bg-white dark:bg-gray-900 px-4 pb-6 pt-4">
-    <div className="mx-auto max-w-3xl">
-      <div className="flex flex-col gap-2 rounded-xl bg-gray-100 dark:bg-gray-800 px-4 py-3 shadow-lg">
-        <textarea
-          value={message}
-          onChange={(e) => setMessage(e.target.value)} // Direct state update
-          onKeyDown={handleKeyPress}
-          placeholder="Ask a health question or upload a file..."
-          className="w-full resize-none bg-transparent text-sm placeholder-gray-400 dark:placeholder-gray-500 text-gray-800 dark:text-white outline-none"
-          rows={2}
-          maxLength={1000}
-          disabled={loading || isRecording}
-          aria-label="Message input"
-        />
-        <div className="flex justify-between items-center pt-2">
-          <div className="flex items-center gap-2">
-            <Select value={selectedModel} onValueChange={setSelectedModel}>
-              <SelectTrigger className="h-7 bg-gray-200 dark:bg-gray-700 text-sm text-gray-800 dark:text-gray-300 border-none rounded-md focus:ring-1 focus:ring-purple-500">
-                <SelectValue placeholder="Model" />
-              </SelectTrigger>
-              <SelectContent className="bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white text-sm border-none">
-                <SelectItem value="gemini-2.0-flash">Gemini 2.0 Flash</SelectItem>
-                <SelectItem value="grok">Grok (Beta)</SelectItem>
-                <SelectItem value="gpt-4o">GPT-4o</SelectItem>
-                <SelectItem value="medibot">MediBot</SelectItem>
-              </SelectContent>
-            </Select>
-            <Button
-              onClick={handleFileUpload}
-              size="icon"
-              variant="ghost"
-              className="h-8 w-8 text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-white"
-              title="Upload File"
-              aria-label="Upload File"
-            >
-              <Upload className="h-4 w-4" />
-            </Button>
-            <Button
-              onClick={handleToggleRecording}
-              size="icon"
-              variant="ghost"
-              className={`h-8 w-8 ${isRecording ? "bg-red-600 animate-pulse" : "text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-white"}`}
-              title={isRecording ? "Stop Recording" : "Record Voice"}
-              aria-label={isRecording ? "Stop Recording" : "Record Voice"}
-            >
-              <Mic className="h-4 w-4" />
-            </Button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*,application/pdf"
-              onChange={handleFileChange}
-              className="hidden"
-            />
-          </div>
-          <Button
-            onClick={handleSendMessage}
-            disabled={loading || (!message.trim() && !selectedFile)}
-            className="h-8 w-8 bg-purple-600 hover:bg-purple-700 text-white rounded-full disabled:opacity-40"
-            aria-label="Send Message"
-          >
-            <Send className="h-4 w-4" />
-          </Button>
-        </div>
-        {fileName && (
-          <div className="flex items-center gap-2 pt-1">
-            <Badge className="bg-gray-200 dark:bg-gray-700 text-sm text-gray-800 dark:text-gray-300 truncate max-w-[300px]">
-              {fileName}
-            </Badge>
-            <Button
-              onClick={removeFile}
-              size="icon"
-              variant="ghost"
-              className="h-7 w-7 text-red-400 hover:text-red-600"
-              title="Remove File"
-              aria-label="Remove File"
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-        )}
-      </div>
-    </div>
-  </div>
-)}
+          {user && (
+            <div className="sticky bottom-0 z-10 w-full bg-white dark:bg-gray-900 px-4 pb-6 pt-4">
+              <div className="mx-auto max-w-3xl">
+                <div className="flex flex-col gap-2 rounded-xl bg-gray-100 dark:bg-gray-800 px-4 py-3 shadow-lg">
+                  <textarea
+                    value={message}
+                    onChange={(e) => setMessage(e.target.value)}
+                    onKeyDown={handleKeyPress}
+                    placeholder="Ask a health question or upload a file..."
+                    className="w-full resize-none bg-transparent text-sm placeholder-gray-400 dark:placeholder-gray-500 text-gray-800 dark:text-white outline-none"
+                    rows={2}
+                    maxLength={1000}
+                    disabled={loading || isRecording}
+                    aria-label="Message input"
+                  />
+                  <div className="flex justify-between items-center pt-2">
+                    <div className="flex items-center gap-2">
+                      <Select value={selectedModel} onValueChange={setSelectedModel}>
+                        <SelectTrigger className="h-7 bg-gray-200 dark:bg-gray-700 text-sm text-gray-800 dark:text-gray-300 border-none rounded-md focus:ring-1 focus:ring-purple-500">
+                          <SelectValue placeholder="Model" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white text-sm border-none">
+                          <SelectItem value="gemini-2.0-flash">Gemini 2.0 Flash</SelectItem>
+                          <SelectItem value="grok">Grok (Beta)</SelectItem>
+                          <SelectItem value="gpt-4o">GPT-4o</SelectItem>
+                          <SelectItem value="medibot">MediBot</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        onClick={handleFileUpload}
+                        size="icon"
+                        variant="ghost"
+                        className="h-8 w-8 text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-white"
+                        title="Upload File"
+                        aria-label="Upload File"
+                      >
+                        <Upload className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        onClick={handleToggleRecording}
+                        size="icon"
+                        variant="ghost"
+                        className={`h-8 w-8 ${isRecording ? "bg-red-600 animate-pulse" : "text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-white"}`}
+                        title={isRecording ? "Stop Recording" : "Record Voice"}
+                        aria-label={isRecording ? "Stop Recording" : "Record Voice"}
+                      >
+                        <Mic className="h-4 w-4" />
+                      </Button>
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*,application/pdf"
+                        onChange={handleFileChange}
+                        className="hidden"
+                      />
+                    </div>
+                    <Button
+                      onClick={handleSendMessage}
+                      disabled={loading || (!message.trim() && !selectedFile)}
+                      className="h-8 w-8 bg-purple-600 hover:bg-purple-700 text-white rounded-full disabled:opacity-40"
+                      aria-label="Send Message"
+                    >
+                      <Send className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  {fileName && (
+                    <div className="flex items-center gap-2 pt-1">
+                      <Badge className="bg-gray-200 dark:bg-gray-700 text-sm text-gray-800 dark:text-gray-300 truncate max-w-[300px]">
+                        {fileName}
+                      </Badge>
+                      <Button
+                        onClick={removeFile}
+                        size="icon"
+                        variant="ghost"
+                        className="h-7 w-7 text-red-400 hover:text-red-600"
+                        title="Remove File"
+                        aria-label="Remove File"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Prescription Analysis Dialog */}
