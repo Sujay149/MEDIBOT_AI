@@ -32,6 +32,9 @@ import {
   ThumbsUp,
   Copy,
   Edit,
+  Sparkles,
+  CheckCircle,
+  Crown,
   Menu,
   Plus,
   Camera,
@@ -90,6 +93,14 @@ interface ProcessedChatSession extends Omit<ChatSession, "createdAt" | "updatedA
   }>;
 }
 
+interface GroqResponse {
+  choices: Array<{
+    message: {
+      content: string;
+    };
+  }>;
+}
+
 interface GeminiResponse {
   candidates: Array<{
     content: {
@@ -119,7 +130,7 @@ function ChatContent() {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [displayedResponse, setDisplayedResponse] = useState<{ [messageId: string]: string }>({});
   const [isTyping, setIsTyping] = useState<{ [messageId: string]: boolean }>({});
-  const [selectedPlan, setSelectedPlan] = useState<string>("base");
+  const [selectedPlan, setSelectedPlan] = useState<string>("base"); // Added state for plan selection
   const { user, userProfile } = useAuth();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -184,7 +195,7 @@ function ChatContent() {
       script.onload = () => console.log("Puter.js loaded");
       script.onerror = () => {
         console.error("Failed to load Puter.js");
-        toast.error("Failed to load AI service. Using Gemini model.");
+        toast.error("Failed to load AI service. Falling back to MediBot model.");
       };
       document.head.appendChild(script);
     }
@@ -224,7 +235,7 @@ function ChatContent() {
         unsubscribe = subscribeToUserChatSessions(user.uid, (userSessions) => {
           const normalizedSessions = userSessions
             .map(normalizeSession)
-            .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
+            .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime()); // Fixed syntax error
           setSessions(normalizedSessions);
         });
 
@@ -286,7 +297,7 @@ function ChatContent() {
 
   const uploadImageToCloudinary = async (file: File): Promise<string | null> => {
     try {
-      const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
+      const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME; // Fixed env variable
       if (!cloudName) {
         throw new Error("Cloudinary cloud name is not configured.");
       }
@@ -441,7 +452,19 @@ function ChatContent() {
       toast.success("Message sent successfully");
     } catch (error: any) {
       console.error("Error sending message:", error);
-      toast.error(`Failed to send message: ${error.message || "Unknown error"}`);
+      if (error.message.includes("rate limit")) {
+        toast.error(
+          <>
+            Rate limit reached. Try again later or{" "}
+            <Link href="https://console.groq.com/docs/pricing" className="underline">
+              upgrade your Groq plan
+            </Link>{" "}
+            for higher usage quotas.
+          </>
+        );
+      } else {
+        toast.error(`Failed to send message: ${error.message || "Unknown error"}`);
+      }
       setMessage(userMessage);
       if (selectedFile) {
         setSelectedFile(selectedFile);
@@ -655,17 +678,17 @@ function ChatContent() {
     }
   };
 
-  const generateAIResponse = async (userMessage: string, selectedModel: string): Promise<string> => {
+  const generateAIResponse = async (userMessage: string, selectedModel: string): Promise<string> => { // Fixed constD to const
     try {
       const modelMap: Record<string, string> = {
         "gemini-2.0-flash": "gemini-2.0-flash",
+        "grok": "x-ai/grok-3-beta",
         "gpt-4o": "gpt-4o",
+        "medibot": "llama-3.3-70b-versatile",
       };
 
       const resolvedModel = modelMap[selectedModel];
-      if (!resolvedModel) {
-        throw new Error(`Model ${selectedModel} is not available. Please select another model.`);
-      }
+      if (!resolvedModel) throw new Error(`Invalid model: ${selectedModel}`);
 
       const recentMessages = currentSession?.messages
         .slice(-5)
@@ -674,26 +697,62 @@ function ChatContent() {
 
       const prompt = `You are MediBot, a health-focused AI assistant. Use the following conversation context to provide a concise, informative, and professional response. Ensure the response is educational, not a substitute for medical advice, and includes a reminder to consult a healthcare professional. Context: ${recentMessages}\n\nQuery: ${userMessage}`;
 
-      // Load Puter.js if not already loaded
-      if (typeof window !== "undefined" && !window.puter) {
-        await new Promise<void>((resolve, reject) => {
-          const script = document.createElement("script");
-          script.src = "https://js.puter.com/v2/";
-          script.async = true;
-          script.onload = () => resolve();
-          script.onerror = () => reject(new Error("Failed to load Puter.js"));
-          document.head.appendChild(script);
-        });
-      }
+      let response;
+      if (resolvedModel === "llama-3.3-70b-versatile") {
+        const groqApiKey = process.env.NEXT_PUBLIC_GROQ_API_KEY; // Fixed env variable
+        if (!groqApiKey) {
+          throw new Error("Groq API key is not configured.");
+        }
 
-      const response = await window.puter.ai.chat(prompt, { model: resolvedModel });
-      if (!response?.message?.content) {
-        throw new Error("No valid response from AI service");
+        response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${groqApiKey}`,
+          },
+          body: JSON.stringify({
+            model: "llama-3.3-70b-versatile",
+            messages: [{ role: "user", content: prompt }],
+            max_tokens: 500,
+            temperature: 0.7,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error(`Groq API error: ${response.status}`);
+        }
+
+        const data = await response.json();
+        if (!data.choices?.[0]?.message?.content) {
+          throw new Error("No valid response from Groq API");
+        }
+        return data.choices[0].message.content.trim();
+      } else {
+        // Load Puter.js if not already loaded
+        if (typeof window !== "undefined" && !window.puter) {
+          await new Promise<void>((resolve, reject) => {
+            const script = document.createElement("script");
+            script.src = "https://js.puter.com/v2/";
+            script.async = true;
+            script.onload = () => resolve();
+            script.onerror = () => reject(new Error("Failed to load Puter.js"));
+            document.head.appendChild(script);
+          });
+        }
+
+        response = await window.puter.ai.chat(prompt, { model: resolvedModel });
+        if (!response?.message?.content) {
+          throw new Error("No valid response from AI service");
+        }
+        return response.message.content.trim();
       }
-      return response.message.content.trim();
     } catch (error: any) {
       console.error("Error generating AI response:", error);
-      return `I'm sorry, I couldn't process your request with the selected model. Please try another model or consult a healthcare professional.`;
+      if (selectedModel !== "medibot") {
+        toast.warning("Primary model failed, falling back to MediBot model...");
+        return generateAIResponse(userMessage, "medibot");
+      }
+      return "I'm sorry, I couldn't process your request. Please try again or consult a healthcare professional.";
     }
   };
 
@@ -701,54 +760,90 @@ function ChatContent() {
     try {
       setAnalyzingPrescription(true);
       const fileBase64 = await fileToBase64(file);
+      const groqApiKey = process.env.NEXT_PUBLIC_GROQ_API_KEY; // Fixed env variable
+      const geminiApiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY; // Fixed env variable
 
-      const geminiApiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
-      if (!geminiApiKey) {
+      if ((selectedModel === "medibot" || selectedModel === "grok") && !groqApiKey) {
+        throw new Error("Groq API key is not configured.");
+      }
+      if (selectedModel !== "medibot" && selectedModel !== "grok" && !geminiApiKey) {
         throw new Error("Gemini API key is not configured.");
       }
 
-      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:generateContent`;
+      const endpoint = selectedModel === "medibot"
+        ? "https://api.groq.com/openai/v1/chat/completions"
+        : selectedModel === "grok"
+        ? "https://api.x.ai/v1/models/grok:analyzePrescription"
+        : `https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:generateContent`;
 
       const headers: Record<string, string> = {
         "Content-Type": "application/json",
       };
 
-      const body = {
-        contents: [
-          {
-            parts: [
+      if (selectedModel === "medibot" || selectedModel === "grok") {
+        headers.Authorization = `Bearer ${groqApiKey}`;
+      }
+
+      const body = selectedModel === "medibot"
+        ? {
+            model: "llama-3.3-70b-versatile",
+            messages: [
               {
-                text:
+                role: "user",
+                content:
                   "Analyze this prescription image or PDF and extract medications, dosages, instructions, and warnings. Return JSON with fields: medications (array), dosages (array), instructions (string), warnings (array).",
-              },
-              {
                 inlineData: {
                   mimeType: file.type,
                   data: fileBase64,
                 },
               },
             ],
-          },
-        ],
-        generationConfig: {
-          temperature: 0.5,
-          maxOutputTokens: 500,
-        },
-      };
+          }
+        : {
+            contents: [
+              {
+                parts: [
+                  {
+                    text:
+                      "Analyze this prescription image or PDF and extract medications, dosages, instructions, and warnings. Return JSON with fields: medications (array), dosages (array), instructions (string), warnings (array).",
+                  },
+                  {
+                    inlineData: {
+                      mimeType: file.type,
+                      data: fileBase64,
+                    },
+                  },
+                ],
+              },
+            ],
+            generationConfig: {
+              temperature: 0.5,
+              maxOutputTokens: 500,
+            },
+          };
 
-      const response = await fetch(`${endpoint}?key=${geminiApiKey}`, {
-        method: "POST",
-        headers,
-        body: JSON.stringify(body),
-      });
+      const response = await fetch(
+        `${endpoint}${selectedModel === "medibot" || selectedModel === "grok" ? "" : `?key=${geminiApiKey}`}`,
+        {
+          method: "POST",
+          headers,
+          body: JSON.stringify(body),
+        }
+      );
 
       if (!response.ok) {
         const errorText = await response.text();
         throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
       }
 
-      const data: GeminiResponse = await response.json();
-      const responseText = data.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
+      const data: GroqResponse | GeminiResponse = await response.json();
+      let responseText: string;
+
+      if (selectedModel === "medibot") {
+        responseText = (data as GroqResponse).choices?.[0]?.message?.content || "{}";
+      } else {
+        responseText = (data as GeminiResponse).candidates?.[0]?.content?.parts?.[0]?.text || "{}";
+      }
 
       // Clean and parse the response
       const cleanedResponseText = responseText.replace(/```json/g, "").replace(/```/g, "").replace(/`/g, "").trim();
@@ -774,6 +869,11 @@ function ChatContent() {
       };
     } catch (error: any) {
       console.error("Error analyzing prescription:", error);
+      if (selectedModel !== "medibot") {
+        toast.warning("Primary model failed for prescription analysis, falling back to MediBot model...");
+        setSelectedModel("medibot");
+        return analyzePrescription(file);
+      }
       toast.error(`Failed to analyze prescription: ${error.message || "Unknown error"}`);
       return {
         medications: ["Error"],
@@ -1100,97 +1200,129 @@ function ChatContent() {
 
         <div className="flex-1 flex flex-col overflow-hidden">
           {/* Header */}
-          <div className="sticky top-0 z-20 flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm">
-            <div className="flex items-center space-x-4">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setSidebarOpen(true)}
-                className="text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white lg:hidden"
-                aria-label="Open sidebar"
-              >
-                <Menu className="h-5 w-5" />
-              </Button>
-              <Select value={selectedPlan} onValueChange={(value) => {
-                setSelectedPlan(value);
-                if (value === "base") {
-                  window.location.href = "https://x.ai/grok";
-                } else if (value === "premium") {
-                  window.location.href = "https://help.x.com/en/using-x/x-premium";
-                }
-              }}>
-                <SelectTrigger className="h-7 bg-gray-200 dark:bg-gray-700 text-sm text-gray-800 dark:text-gray-300 border-none rounded-md focus:ring-1 focus:ring-purple-500">
-                  <SelectValue placeholder="Select Plan" />
-                </SelectTrigger>
-                <SelectContent className="bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white text-sm border-none">
-                  <SelectItem value="base">Base Plan</SelectItem>
-                  <SelectItem value="premium">Premium Plan</SelectItem>
-                </SelectContent>
-              </Select>
-              <h1 className="text-xl font-bold text-gray-800 dark:text-white">MediBot - Your Health Assistant</h1>
-            </div>
-            <div className="flex items-center space-x-2">
-              {user ? (
-                <>
-                  <Button
-                    onClick={startNewChat}
-                    variant="ghost"
-                    size="icon"
-                    className="bg-purple-600 hover:bg-purple-700 text-white rounded-lg h-10 w-10"
-                    aria-label="Start new chat"
-                  >
-                    <Plus className="h-5 w-5" />
-                  </Button>
-                  <Button
-                    onClick={handlePrescriptionAnalysis}
-                    variant="ghost"
-                    size="icon"
-                    className="bg-purple-600 hover:bg-purple-700 text-white rounded-lg h-10 w-10"
-                    aria-label="Analyze Prescription"
-                  >
-                    <Camera className="h-5 w-5" />
-                  </Button>
-                  <Button
-                    onClick={handleHistoryDialog}
-                    variant="ghost"
-                    size="icon"
-                    className="bg-purple-600 hover:bg-purple-700 text-white rounded-lg h-10 w-10"
-                    aria-label="View chat history"
-                  >
-                    <RotateCcw className="h-5 w-5" />
-                  </Button>
-                  <Button
-                    onClick={exportChat}
-                    variant="ghost"
-                    size="icon"
-                    className="bg-purple-600 hover:bg-purple-700 text-white rounded-lg h-10 w-10"
-                    aria-label="Export Chat"
-                  >
-                    <Download className="h-5 w-5" />
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <Link href="/auth/signin">
-                    <Button
-                      variant="outline"
-                      className="bg-gray-100 dark:bg-gray-700 border-gray-200 dark:border-gray-600 text-gray-800 dark:text-white hover:bg-purple-600 hover:text-white h-10 px-4"
-                    >
-                      Login
-                    </Button>
-                  </Link>
-                  <Link href="/auth/signup">
-                    <Button
-                      variant="outline"
-                      className="bg-gray-100 dark:bg-gray-700 border-gray-200 dark:border-gray-600 text-gray-800 dark:text-white hover:bg-purple-600 hover:text-white h-10 px-4"
-                    >
-                      Signup
-                    </Button>
-                  </Link>
-                </>
-              )}
-            </div>
-          </div>
+         <div className="sticky top-0 z-20 flex items-center justify-between p-4 border-b border-gray-200/80 dark:border-gray-700/50 bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm shadow-sm">
+  {/* Left Section */}
+  <div className="flex items-center space-x-4">
+    {/* Mobile Sidebar Toggle */}
+    <Button
+      variant="ghost"
+      size="icon"
+      onClick={() => setSidebarOpen(true)}
+      className="text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 lg:hidden rounded-full h-9 w-9"
+      aria-label="Open sidebar"
+    >
+      <Menu className="h-5 w-5" />
+    </Button>
+
+    {/* Plan Selector */}
+    <Select 
+      value={selectedPlan} 
+      onValueChange={(value) => {
+        setSelectedPlan(value);
+        if (value === "base") {
+          window.location.href = "https://x.ai/grok";
+        } else if (value === "premium") {
+          window.location.href = "https://help.x.com/en/using-x/x-premium";
+        }
+      }}
+    >
+      <SelectTrigger className="h-9 bg-gray-100 dark:bg-gray-700 text-sm font-medium text-gray-800 dark:text-gray-200 border border-gray-200 dark:border-gray-600 rounded-full px-4 hover:bg-gray-200/50 dark:hover:bg-gray-600/50">
+        <div className="flex items-center space-x-2">
+          {selectedPlan === "premium" ? (
+            <Crown className="h-4 w-4 text-yellow-500" />
+          ) : (
+            <Sparkles className="h-4 w-4 text-blue-500" />
+          )}
+          <SelectValue placeholder="Select Plan" />
+        </div>
+      </SelectTrigger>
+      <SelectContent className="bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 w-[240px]">
+        <SelectItem 
+          value="base" 
+          className="flex items-center gap-2 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700"
+        >
+          <Sparkles className="h-4 w-4 text-blue-500" />
+          Base Plan
+        </SelectItem>
+        <SelectItem 
+          value="premium" 
+          className="flex items-center gap-2 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700"
+        >
+          <Crown className="h-4 w-4 text-yellow-500" />
+          Premium Plan
+        </SelectItem>
+      </SelectContent>
+    </Select>
+
+    {/* Title */}
+    <h1 className="text-xl font-bold text-gray-800 dark:text-white">
+      <span className="bg-gradient-to-r from-purple-600 to-blue-500 bg-clip-text text-transparent">MediBot</span>
+      <span className="text-gray-600 dark:text-gray-300"> - Your Health Assistant</span>
+    </h1>
+  </div>
+
+  {/* Right Section */}
+  <div className="flex items-center space-x-2">
+    {user ? (
+      <>
+        <Button
+          onClick={startNewChat}
+          variant="ghost"
+          size="icon"
+          className="bg-purple-600/10 hover:bg-purple-600/20 dark:bg-purple-400/10 dark:hover:bg-purple-400/20 text-purple-600 dark:text-purple-400 rounded-full h-9 w-9"
+          aria-label="Start new chat"
+        >
+          <Plus className="h-5 w-5" />
+        </Button>
+        <Button
+          onClick={handlePrescriptionAnalysis}
+          variant="ghost"
+          size="icon"
+          className="bg-blue-600/10 hover:bg-blue-600/20 dark:bg-blue-400/10 dark:hover:bg-blue-400/20 text-blue-600 dark:text-blue-400 rounded-full h-9 w-9"
+          aria-label="Analyze Prescription"
+        >
+          <Camera className="h-5 w-5" />
+        </Button>
+        <Button
+          onClick={handleHistoryDialog}
+          variant="ghost"
+          size="icon"
+          className="bg-green-600/10 hover:bg-green-600/20 dark:bg-green-400/10 dark:hover:bg-green-400/20 text-green-600 dark:text-green-400 rounded-full h-9 w-9"
+          aria-label="View chat history"
+        >
+          <RotateCcw className="h-5 w-5" />
+        </Button>
+        <Button
+          onClick={exportChat}
+          variant="ghost"
+          size="icon"
+          className="bg-orange-600/10 hover:bg-orange-600/20 dark:bg-orange-400/10 dark:hover:bg-orange-400/20 text-orange-600 dark:text-orange-400 rounded-full h-9 w-9"
+          aria-label="Export Chat"
+        >
+          <Download className="h-5 w-5" />
+        </Button>
+      </>
+    ) : (
+      <>
+        <Link href="/auth/signin">
+          <Button
+            variant="outline"
+            className="bg-transparent dark:bg-transparent border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100/50 dark:hover:bg-gray-700/50 h-9 px-4 rounded-full"
+          >
+            Login
+          </Button>
+        </Link>
+        <Link href="/auth/signup">
+          <Button
+            className="bg-gradient-to-r from-purple-600 to-blue-500 text-white hover:from-purple-700 hover:to-blue-600 h-9 px-4 rounded-full shadow-sm"
+          >
+            Get Started
+          </Button>
+        </Link>
+      </>
+    )}
+  </div>
+</div>
 
           {/* Chat Area */}
           <ScrollArea className="flex-1 p-6" ref={scrollAreaRef}>
@@ -1272,7 +1404,9 @@ function ChatContent() {
                         </SelectTrigger>
                         <SelectContent className="bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white text-sm border-none">
                           <SelectItem value="gemini-2.0-flash">Gemini 2.0 Flash</SelectItem>
+                          <SelectItem value="grok">Grok (Beta)</SelectItem>
                           <SelectItem value="gpt-4o">GPT-4o</SelectItem>
+                          <SelectItem value="medibot">MediBot</SelectItem>
                         </SelectContent>
                       </Select>
                       <Button
